@@ -1,0 +1,20 @@
+/* Blood Connect India Styles */
+body{
+  margin:0;
+  padding:0;
+  font-family:Arial,sans-serif;
+  background:#f5f5f5;
+}
+
+.container{
+  width:90%;
+  margin:auto;
+}
+
+.btn{
+  background:#c00000;
+  color:#fff;
+  padding:15px;
+  border:none;
+  border-radius:8px;
+}
