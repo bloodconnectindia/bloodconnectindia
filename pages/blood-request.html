@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Request</title>
+
+    <style>
+        body{
+            margin:0;
+            font-family:Arial,sans-serif;
+            background:#f4f4f4;
+        }
+
+        .container{
+            width:400px;
+            margin:40px auto;
+            background:#fff;
+            padding:25px;
+            border-radius:10px;
+            box-shadow:0 0 10px rgba(0,0,0,.2);
+        }
+
+        h1{
+            text-align:center;
+            color:#c00000;
+        }
+
+        label{
+            font-weight:bold;
+        }
+
+        input,select,textarea{
+            width:100%;
+            padding:10px;
+            margin-top:5px;
+            margin-bottom:15px;
+            border:1px solid #ccc;
+            border-radius:5px;
+            box-sizing:border-box;
+        }
+
+        button{
+            width:100%;
+            background:#c00000;
+            color:white;
+            padding:12px;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+            font-size:16px;
+        }
+
+        button:hover{
+            background:#900000;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Blood Request Form</h1>
+
+<form>
+
+<label>Patient Name</label>
+<input type="text" id="patient_name">
+
+<label>Blood Group</label>
+<select id="blood_group">
+<option>A+</option>
+<option>A-</option>
+<option>B+</option>
+<option>B-</option>
+<option>AB+</option>
+<option>AB-</option>
+<option>O+</option>
+<option>O-</option>
+</select>
+
+<label>Hospital Name</label>
+<input type="text" id="hospital">
+
+<label>Mobile Number</label>
+<input type="text" id="mobile">
+
+<label>Address</label>
+<textarea id="address"></textarea>
+
+<button type="submit">
+Submit Blood Request
+</button>
+
+</form>
+
+</div>
+<script src="../js/blood-request.js"></script>
+</body>
+</html>

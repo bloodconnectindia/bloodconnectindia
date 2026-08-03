@@ -61,7 +61,7 @@ color:white;
 
 <h2>Welcome</h2>
 
-<a class="button" href="#">Blood Request</a>
+<a class="button" href="pages/blood-request.html">Blood Request</a>
 
 <a class="button" href="#">Donor Registration</a>
 
@@ -77,5 +77,15 @@ color:white;
 © 2026 Blood Connect India
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const supabaseUrl = "https://olgsgkztorkobuxeyhvb.supabase.co";
+const supabaseKey = "sb_publishable_TZw6_i_aZhf-xl3xx7cUZQ_sxvRrsu3";
+
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+</script>
+
+<script src="../js/blood-request.js"></script>
 </body>
 </html>
