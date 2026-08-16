@@ -1,0 +1,11 @@
+{
+  "runnableMigrations": [
+    "202608120001_security_authorization_and_request_controls.sql",
+    "202608120004_live_aligned_demo_lifecycle.sql"
+  ],
+  "denylistedLegacyMigrations": {
+    "202608080001_foundation_auth_roles.sql": "5E006AC840214589C980F3DACB2925C1588307DB87EA1BD5828B3345B45650DF",
+    "202608080002_demo_safety.sql": "13E92526604A4C375643DE95C6D5E922C7A0570BE648ACA0CAE8492CBA294942",
+    "202608080003_admin_demo_reset.sql": "4F2727FD7FD9EB2BB1C85AF4771EA9B1360FD12A0972490F0B4C9EFEBB2C9069"
+  }
+}
