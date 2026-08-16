@@ -7,7 +7,7 @@ readonly state_dir="${RUNNER_TEMP:-}/bci-controlled-migrations-${BCI_TEST_RUN_ID
 phase="${1:-}"
 
 case "$phase" in
-  start-local-stack|baseline|schema-preflight|identity-negative|identity-clean|identity-index|authorization-migration|authorization-verification|demo-migration|demo-verification|auth-fixtures|edge-functions|concurrency-replay|password-recovery) ;;
+  start-local-stack|baseline|schema-preflight|identity-negative|identity-clean|identity-foundation|identity-index|authorization-migration|authorization-verification|demo-migration|demo-verification|auth-fixtures|edge-functions|concurrency-replay|password-recovery) ;;
   *) echo '{"phase":"unknown","status":"failed","reason":"unknown-phase"}' >&2; exit 64 ;;
 esac
 
@@ -55,6 +55,14 @@ case "$phase" in
     psql_file supabase/tests/integration/ci/auth-identity-adapter.sql
     psql_file supabase/staged-migrations/202608120002_users_identity_preflight.sql
     psql_file supabase/staged-migrations/202608120002_users_identity_preflight.sql
+    ;;
+  identity-foundation)
+    psql_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
+    psql_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
+    psql_file supabase/tests/integration/ci/verify-canonical-identity-foundation.sql
+    bash supabase/tests/integration/ci/run-canonical-identity-negative-cases.sh \
+      "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
+    psql_file "$state_dir/migrations/202608110001_authoritative_schema_preflight.sql"
     ;;
   identity-index)
     psql_file supabase/staged-migrations/202608120003_users_identity_unique_index.sql

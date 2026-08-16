@@ -1,6 +1,7 @@
 {
   "runnableMigrations": [
     "202608110001_authoritative_schema_preflight.sql",
+    "202608110002_canonical_identity_foundation.sql",
     "202608120001_security_authorization_and_request_controls.sql",
     "202608120004_live_aligned_demo_lifecycle.sql"
   ],

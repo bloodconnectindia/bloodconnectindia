@@ -28,7 +28,7 @@ Deno.test("adapter uses native Auth and reserved fake identities only", () => {
 });
 
 Deno.test("phase allowlist and exact controlled order are present", () => {
-  const phases = ["start-local-stack", "baseline", "schema-preflight", "identity-negative", "identity-clean", "identity-index", "authorization-migration", "authorization-verification", "demo-migration", "demo-verification", "auth-fixtures", "edge-functions", "concurrency-replay", "password-recovery"];
+  const phases = ["start-local-stack", "baseline", "schema-preflight", "identity-negative", "identity-clean", "identity-foundation", "identity-index", "authorization-migration", "authorization-verification", "demo-migration", "demo-verification", "auth-fixtures", "edge-functions", "concurrency-replay", "password-recovery"];
   const dispatcher = driver.slice(driver.lastIndexOf('case "$phase" in'));
   let position = -1;
   for (const phase of phases) {
