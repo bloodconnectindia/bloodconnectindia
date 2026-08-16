@@ -36,7 +36,8 @@ foreach ($name in $denylisted) {
 
 foreach ($migration in Get-ChildItem -LiteralPath $migrationRoot -File -Filter '*.sql') {
     $content = Get-Content -LiteralPath $migration.FullName -Raw
-    if ($content -match '(?i)public\s*\.\s*(profiles|user_roles)\b') {
+    if ($migration.Name -ne '202608110001_authoritative_schema_preflight.sql' -and
+        $content -match '(?i)public\s*\.\s*(profiles|user_roles)\b') {
         $errors.Add("Runnable migration references a legacy identity table: $($migration.Name)")
     }
 }

@@ -7,7 +7,7 @@ readonly state_dir="${RUNNER_TEMP:-}/bci-controlled-migrations-${BCI_TEST_RUN_ID
 phase="${1:-}"
 
 case "$phase" in
-  start-local-stack|baseline|identity-negative|identity-clean|identity-index|authorization-migration|authorization-verification|demo-migration|demo-verification|auth-fixtures|edge-functions|concurrency-replay|password-recovery) ;;
+  start-local-stack|baseline|schema-preflight|identity-negative|identity-clean|identity-index|authorization-migration|authorization-verification|demo-migration|demo-verification|auth-fixtures|edge-functions|concurrency-replay|password-recovery) ;;
   *) echo '{"phase":"unknown","status":"failed","reason":"unknown-phase"}' >&2; exit 64 ;;
 esac
 
@@ -42,6 +42,10 @@ case "$phase" in
     [[ -f "$state_dir/stack-started" ]] || fail "stack-state-missing"
     psql_file supabase/tests/integration/ci/disposable-baseline.sql
     psql_file supabase/tests/integration/00_baseline_assertions.sql
+    ;;
+  schema-preflight)
+    psql_file "$state_dir/migrations/202608110001_authoritative_schema_preflight.sql"
+    psql_file "$state_dir/migrations/202608110001_authoritative_schema_preflight.sql"
     ;;
   identity-negative)
     require_file supabase/tests/integration/ci/run-negative-identity-cases.sh
