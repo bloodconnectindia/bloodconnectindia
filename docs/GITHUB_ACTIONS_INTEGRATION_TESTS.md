@@ -23,8 +23,11 @@ tables whose columns have not been verified are empty relations used solely to
 exercise migration policies. `blood_requests` contains only the five fields
 evidenced by prepared server functions. This is not a production-schema export.
 
-Before `supabase start`, the driver hashes and moves the two controlled runnable
-migrations into a run-specific directory under `RUNNER_TEMP`. It verifies that
+Before `supabase start`, the driver hashes and moves the four controlled runnable
+migrations into a run-specific directory under `RUNNER_TEMP`: authoritative
+schema preflight (`202608110001`), canonical identity foundation (`202608110002`),
+authorization and request controls (`202608120001`), and demo lifecycle
+(`202608120004`). It verifies that
 automatic migration discovery is empty, then starts the stack. Later phases use
 the quarantined exact files explicitly. The always-run cleanup restores them and
 verifies their original SHA-256 hashes. Any nonempty quarantine or checksum
@@ -90,18 +93,30 @@ expressions, environment bindings, or environment-level credentials later.
 
 ## Controlled phases
 
-Once separately implemented, the serialized driver must:
+Once separately approved for disposable database execution, the serialized
+driver must:
 
 1. Temporarily prevent automatic migration discovery before local stack startup.
 2. Start only the runner-local database, Auth, Edge Runtime, and InBucket services.
 3. Validate and install the approved disposable baseline.
-4. Prove duplicate, unmatched, and privileged-null identity failures on recreated
+4. Apply the authoritative schema preflight (`202608110001`) and fail closed on
+   any incompatible live-aligned schema or identity assumption.
+5. Prove duplicate, unmatched, and privileged-null identity failures on recreated
    disposable snapshots.
-5. Load clean fake identities and rerun preflight until clean.
-6. create the partial unique index outside a transaction and verify it.
-7. Apply `202608120001`, then authorization/RLS/ACL/audit tests.
-8. Apply `202608120004`, then demo lifecycle tests.
-9. Run local Edge Function, two-session concurrency/replay, and InBucket recovery tests.
+6. Load clean fake identities and rerun the staged identity preflight until clean.
+7. Apply the canonical identity foundation (`202608110002`) through the
+   `identity-foundation` phase and verify that it adds the nullable canonical
+   identity objects without backfilling or rewriting user rows.
+8. Run `identity-evidence` in a repeatable-read, read-only transaction, twice for
+   repeatability, then run its aggregate-only disposable verification. This phase
+   emits only counts and a `GO`/`NO_GO` decision; it performs no identity backfill
+   and remains outside the runnable migration manifest.
+9. Create the staged partial unique legacy identity index outside a transaction
+   and verify it.
+10. Apply authorization and request controls (`202608120001`), then run the
+    authorization/RLS/ACL/audit tests.
+11. Apply demo lifecycle (`202608120004`), then run the demo lifecycle tests.
+12. Run local Edge Function, two-session concurrency/replay, and InBucket recovery tests.
 
 The phase driver must stop at the first failure and must never silently skip a
 prerequisite.

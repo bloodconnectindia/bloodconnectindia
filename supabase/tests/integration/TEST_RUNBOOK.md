@@ -44,32 +44,50 @@ The GitHub driver first quarantines runnable migration files under its ephemeral
 them in the always-run cleanup. This prevents startup discovery from bypassing
 the manual identity stages.
 
-1. Run the local, read-only migration runner guard. Confirm only `202608120001`
-   and `202608120004` are runnable.
+1. Run the local, read-only migration runner guard. Confirm exactly these four
+   controlled migrations are runnable, in this order:
+   `202608110001` authoritative schema preflight, `202608110002` canonical
+   identity foundation, `202608120001` authorization and request controls, and
+   `202608120004` live-aligned demo lifecycle. The exact filenames appear below
+   at their controlled execution points.
 2. Connect only after separate approval and set the disposable session guard.
 3. Execute `00_baseline_assertions.sql`.
-4. In a disposable snapshot, prepare each dirty case from
+4. Apply `202608110001_authoritative_schema_preflight.sql` and stop if any
+   authoritative schema or identity assumption fails.
+5. In a disposable snapshot, prepare each dirty case from
    `02_identity_negative_cases.sql`, then run the staged identity preflight and
    prove duplicate and unmatched identities abort. Confirm null identities are
    reported. Roll back/recreate after every case.
-5. Load `01_identity_fixtures.sql`. If verified baseline constraints require
+6. Load `01_identity_fixtures.sql`. If verified baseline constraints require
    additional non-identity fields, stop and prepare a reviewed adapter; do not
    weaken constraints.
-6. Run `staged-migrations/202608120002_users_identity_preflight.sql` manually.
+7. Run `staged-migrations/202608120002_users_identity_preflight.sql` manually.
    Resolve every duplicate/unmatched identity and review all null identities.
-7. Repeat the preflight until clean.
-8. Apply `staged-migrations/202608120003_users_identity_unique_index.sql` using
+8. Repeat the preflight until clean.
+9. Apply `202608110002_canonical_identity_foundation.sql` through the
+   `identity-foundation` phase. Verify the nullable `auth_user_id` foundation,
+   constraints, and partial unique index were created without changing identity
+   values or backfilling any row.
+10. Run the `identity-evidence` phase only after the same disposable-target and
+    database-execution approvals required for every SQL phase. It executes
+    `staged-migrations/202608170001_identity_reconciliation_evidence.sql` in a
+    repeatable-read, read-only transaction, repeats it to prove stable read-only
+    execution, and runs the aggregate-only disposable verification. The phase
+    emits only counts and a `GO`/`NO_GO` decision. It does not insert, update,
+    delete, rewrite, or backfill identity data and is intentionally excluded from
+    `migration-manifest.json`.
+11. Apply `staged-migrations/202608120003_users_identity_unique_index.sql` using
    a client path that does not wrap `CREATE INDEX CONCURRENTLY` in a transaction.
-9. Verify the index is unique, valid, and partial on `user_id is not null`.
-10. Apply `202608120001_security_authorization_and_request_controls.sql` only.
-11. Execute `03_post_security_verification.sql` and the applicable sections of
+12. Verify the index is unique, valid, and partial on `user_id is not null`.
+13. Apply `202608120001_security_authorization_and_request_controls.sql` only.
+14. Execute `03_post_security_verification.sql` and the applicable sections of
     `05_rls_acl_matrix.sql` in isolated transactions.
-12. Apply `202608120004_live_aligned_demo_lifecycle.sql` only.
-13. Execute `04_post_demo_verification.sql`, the remaining RLS/ACL matrix, and
+15. Apply `202608120004_live_aligned_demo_lifecycle.sql` only.
+16. Execute `04_post_demo_verification.sql`, the remaining RLS/ACL matrix, and
     the cases in `06_failure_concurrency_cases.md`.
-14. Run approved Edge Functions locally against this disposable target for
+17. Run approved Edge Functions locally against this disposable target for
     login, request, restore, demo seed/reset, compensation, audit, and replay tests.
-15. Destroy the disposable environment and verify credentials/test artifacts
+18. Destroy the disposable environment and verify credentials/test artifacts
     were not written to the repository.
 
 Never use `supabase db push` for this sequence. The concurrent index is a manual
