@@ -1,28 +1,26 @@
 \ir ../_disposable_guard.sql
 
 -- PROPOSED LOCAL ADAPTER ONLY. DO NOT APPLY TO THE LIVE PROJECT.
--- Exact table ACL inventory observed read-only in the authenticated Supabase
--- Dashboard on 2026-08-14. Every listed ACL item was granted by postgres and
--- was reported without grant option. All six relations are owned by postgres
--- and have RLS enabled. No column-level ACL was present.
+-- Least-privilege disposable ACL adapter. All six relations remain owned by
+-- postgres with RLS enabled, and no column-level ACL is permitted.
+revoke all privileges
+on table public.users, public.donors, public.blood_requests,
+  public.blood_stock, public.blood_banks, public.hospitals
+from public, anon, authenticated, service_role;
 
--- Live ACL: postgres=arwdDxtm, authenticated=arwdDxtm, service_role=arwdDxtm
--- on every operational table.
 grant select, insert, update, delete, truncate, references, trigger, maintain
 on table public.users, public.donors, public.blood_requests,
   public.blood_stock, public.blood_banks, public.hospitals
-to postgres, authenticated, service_role;
+to postgres;
 
--- Live anon ACL is arwdDxtm on all operational tables except blood_requests.
-grant select, insert, update, delete, truncate, references, trigger, maintain
-on table public.users, public.donors, public.blood_stock,
-  public.blood_banks, public.hospitals
-to anon;
+grant select
+on table public.users, public.donors, public.blood_requests,
+  public.blood_stock, public.blood_banks, public.hospitals
+to authenticated;
 
--- Live public.blood_requests anon ACL is exactly am: INSERT and MAINTAIN.
-grant insert, maintain on table public.blood_requests to anon;
+grant select, insert, delete on table public.users to service_role;
 
--- Fail if this disposable adapter ever expands beyond the observed grantees or
+-- Fail if this disposable adapter ever expands beyond the approved grantees or
 -- privileges. Policy behavior is asserted separately because the prepared
 -- authorization migration intentionally adds permission-based policies while
 -- preserving live legacy policy names during transition.
@@ -57,11 +55,13 @@ begin
       and c.relname in ('users','donors','blood_requests','blood_stock','blood_banks','hospitals')
   ) actual
   where actual.grantor<>'postgres' or actual.is_grantable
-     or actual.grantee not in ('postgres','anon','authenticated','service_role')
-     or actual.privilege_type not in
-       ('SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN')
-     or (actual.relname='blood_requests' and actual.grantee='anon'
-         and actual.privilege_type not in ('INSERT','MAINTAIN'));
+     or not (
+       (actual.grantee='postgres' and actual.privilege_type in
+         ('SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN'))
+       or (actual.grantee='authenticated' and actual.privilege_type='SELECT')
+       or (actual.relname='users' and actual.grantee='service_role'
+           and actual.privilege_type in ('SELECT','INSERT','DELETE'))
+     );
   if unexpected<>0 then
     raise exception 'Verified operational ACL contains an unreviewed grant';
   end if;
@@ -74,8 +74,8 @@ begin
   ) a
   where n.nspname='public'
     and c.relname in ('users','donors','blood_requests','blood_stock','blood_banks','hospitals');
-  if unexpected<>186 then
-    raise exception 'Verified operational ACL is incomplete: expected 186 entries, found %', unexpected;
+  if unexpected<>57 then
+    raise exception 'Verified operational ACL is incomplete: expected 57 entries, found %', unexpected;
   end if;
 
   if exists (

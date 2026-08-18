@@ -27,13 +27,14 @@ const fullPrivileges = [
 const fullTables = [
   "users",
   "donors",
+  "blood_requests",
   "blood_stock",
   "blood_banks",
   "hospitals",
 ];
 
 Deno.test("authoritative adapter contains the exact six-table grant matrix", () => {
-  for (const table of [...fullTables, "blood_requests"]) {
+  for (const table of fullTables) {
     if (!adapter.includes(`public.${table}`)) {
       throw new Error(`Missing table: ${table}`);
     }
@@ -43,59 +44,51 @@ Deno.test("authoritative adapter contains the exact six-table grant matrix", () 
       throw new Error(`Missing privilege: ${privilege}`);
     }
   }
-  if (!adapter.includes("to postgres, authenticated, service_role")) {
-    throw new Error("Full non-anon grantee matrix missing");
+  if (!/grant select, insert, update, delete, truncate, references, trigger, maintain[\s\S]*?to postgres;/i.test(adapter)) {
+    throw new Error("Exact postgres grant matrix missing");
   }
-  if (!adapter.includes("to anon;")) throw new Error("Anon matrix missing");
-  for (const forbidden of ["to public", "with grant option"]) {
+  if (!/grant select[\s\S]*?to authenticated;/i.test(adapter)) {
+    throw new Error("Exact authenticated grant matrix missing");
+  }
+  if (!/grant select, insert, delete on table public\.users to service_role;/i.test(adapter)) {
+    throw new Error("Exact service_role grant matrix missing");
+  }
+  for (const forbidden of ["to public", "to anon", "with grant option"]) {
     if (adapter.toLowerCase().includes(forbidden)) {
       throw new Error(`Unexpected ACL expansion: ${forbidden}`);
     }
   }
 });
 
-Deno.test("blood_requests anon exception is exactly INSERT plus MAINTAIN", () => {
-  const anonStatements = (adapter.match(/grant[\s\S]*?;/gi) ?? []).filter(
-    (statement) => /to\s+anon\s*;/i.test(statement),
-  );
-  if (anonStatements.length !== 2) {
-    throw new Error(
-      `Unexpected anon GRANT statement count: ${anonStatements.length}`,
-    );
+Deno.test("non-owner grants remain least privilege", () => {
+  const grants = adapter.match(/^grant[\s\S]*?;/gim) ?? [];
+  if (grants.length !== 3) {
+    throw new Error(`Unexpected GRANT statement count: ${grants.length}`);
   }
-  const bloodRequestStatement = anonStatements.find((statement) =>
-    /public\.blood_requests/i.test(statement)
+  const authenticated = grants.find((statement) =>
+    /to\s+authenticated\s*;/i.test(statement)
   );
-  if (!bloodRequestStatement) {
-    throw new Error("blood_requests anon statement missing");
+  if (!authenticated || !/^grant\s+select\b/i.test(authenticated.trim())) {
+    throw new Error("authenticated must receive SELECT only");
   }
-  if (
-    !/grant\s+insert,\s*maintain\s+on\s+table\s+public\.blood_requests\s+to\s+anon;/i
-      .test(adapter)
-  ) throw new Error("Exact blood_requests anon grant missing");
-  for (
-    const forbidden of [
-      "select",
-      "update",
-      "delete",
-      "truncate",
-      "references",
-      "trigger",
-    ]
-  ) {
-    if (new RegExp(`\\b${forbidden}\\b`, "i").test(bloodRequestStatement)) {
-      throw new Error(`blood_requests anon grant expanded with ${forbidden}`);
-    }
+  const serviceRole = grants.find((statement) =>
+    /to\s+service_role\s*;/i.test(statement)
+  );
+  if (!serviceRole || !/public\.users\s+to\s+service_role/i.test(serviceRole)) {
+    throw new Error("service_role must be limited to public.users");
+  }
+  if (/\b(update|truncate|references|trigger|maintain)\b/i.test(serviceRole)) {
+    throw new Error("service_role privilege expansion found");
   }
 });
 
-Deno.test("186 expanded entries are derived exactly from authoritative facts", () => {
-  const derived = fullTables.length * 4 * fullPrivileges.length +
-    3 * fullPrivileges.length + 2;
-  if (derived !== 186) {
+Deno.test("57 expanded entries are derived exactly from authoritative facts", () => {
+  const derived = fullTables.length * fullPrivileges.length +
+    fullTables.length + 3;
+  if (derived !== 57) {
     throw new Error(`Unexpected derived ACL count: ${derived}`);
   }
-  if (!adapter.includes("unexpected<>186")) {
+  if (!adapter.includes("unexpected<>57")) {
     throw new Error("Adapter exact-count assertion missing");
   }
 });
@@ -107,7 +100,8 @@ Deno.test("adapter fails closed on owner, RLS, grantor, grantability, grantee, a
       "not c.relrowsecurity",
       "actual.grantor<>'postgres'",
       "actual.is_grantable",
-      "actual.grantee not in ('postgres','anon','authenticated','service_role')",
+      "actual.grantee='authenticated' and actual.privilege_type='SELECT'",
+      "actual.relname='users' and actual.grantee='service_role'",
       "a.attacl is not null",
     ]
   ) {

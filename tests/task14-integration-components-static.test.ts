@@ -38,7 +38,7 @@ Deno.test("authoritative ACL adapter remains exact and fail closed", () => {
   const adapter = content.get(files[0])!;
   for (
     const required of [
-      "unexpected<>186",
+      "unexpected<>57",
       "raise exception",
       "actual.grantor<>'postgres'",
       "actual.is_grantable",
