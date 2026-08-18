@@ -6,9 +6,9 @@ readonly psql_bin="${BCI_PSQL_BIN:-psql}"
 scope="${1:-}"
 case "$scope" in authorization|demo) ;; *) exit 64 ;; esac
 
-# Assertions that are safe to evaluate as the database owner. Browser-role
-# denial cases require the verified live operational grant baseline. It is not
-# currently known, so this phase fails closed instead of inventing grants.
+# The reviewed disposable target is the exact 57-entry operational ACL matrix.
+# The adapter fails closed on every additional or missing ACL entry. This is an
+# integration-only disposable target, not a production/live-project ACL inventory.
 acl_adapter="supabase/tests/integration/ci/verified-operational-acl.sql"
 rls_cases="supabase/tests/integration/ci/rls-acl-local.sql"
 for required in "$acl_adapter" "$rls_cases"; do

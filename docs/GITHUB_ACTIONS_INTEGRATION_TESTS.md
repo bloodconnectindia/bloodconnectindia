@@ -45,9 +45,9 @@ A human may authorize creation of `PHASE_DRIVER_APPROVED` only after reviewing:
 6. Authorization/demo assertions and their expected-denial isolation.
 7. The prepared local Edge Function, bounded concurrency/replay, recovery, and
    isolated RLS cases. These require a reviewed disposable Auth fixture bootstrap.
-8. `verified-operational-acl.sql` intentionally fails closed until an exact,
-   authoritative inventory identifies every current operational table grantee
-   and privilege. The statement that live grants are "broad" is insufficient.
+8. `verified-operational-acl.sql` enforces the reviewed disposable target of
+   exactly 57 expanded ACL entries and fails closed on every additional or
+   missing entry. This is not a production/live-project ACL inventory.
 9. A separate approval to execute database-backed CI and consume Actions minutes.
 
 Creating the marker is an execution authorization decision, not a normal setup
@@ -97,7 +97,12 @@ Once separately approved for disposable database execution, the serialized
 driver must:
 
 1. Temporarily prevent automatic migration discovery before local stack startup.
-2. Start only the runner-local database, Auth, Edge Runtime, and InBucket services.
+2. Start only the required runner-local PostgreSQL, Kong/API gateway, Auth,
+   PostgREST, Edge Runtime/local function serving, and InBucket services. Studio
+   is optional for automation. Vector may be unhealthy or restarting on Windows
+   without blocking this specific suite because no current assertion depends on
+   Vector. This narrow exemption must be reconsidered if logging or analytics
+   assertions later depend on Vector.
 3. Validate and install the approved disposable baseline.
 4. Apply the authoritative schema preflight (`202608110001`) and fail closed on
    any incompatible live-aligned schema or identity assumption.

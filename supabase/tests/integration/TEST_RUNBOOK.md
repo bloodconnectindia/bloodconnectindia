@@ -37,6 +37,15 @@ set bci.test.run_id = 'bci-local-<unique-lowercase-run-id>';
 Every harness SQL file includes `_disposable_guard.sql` and refuses to continue
 without both settings. The guard supplements—not replaces—human target review.
 
+### Required local services
+
+This suite requires PostgreSQL, Kong/API gateway, Auth, PostgREST, Edge
+Runtime/local function serving, and InBucket. Studio is optional for automated
+execution. Vector may be unhealthy or restarting on Windows without blocking
+this specific disposable suite because its current assertions do not depend on
+Vector. This exemption is limited to the current suite and must be reconsidered
+if future logging or analytics assertions depend on Vector.
+
 ## Exact controlled order
 
 The GitHub driver first quarantines runnable migration files under its ephemeral
@@ -116,6 +125,17 @@ rejection for sensitive permissions, and Super Admin full-access behavior. For
 each server operation verify an audit row records actor, action, target, reason,
 timestamp, correlation/request ID, result, and non-secret failure category.
 Passwords, tokens, keys, DB URLs, and HMAC material must never appear in audit.
+
+### Future security-alert requirement
+
+Suspicious or repeated failed security events must remain auditable. Initial
+operational security alerts may be routed to Admin; once Super Admin is
+implemented, Super Admin should become the primary security-alert recipient.
+Alert generation must be server-side and permission-controlled, and delivery
+must not expose secrets, credentials, bearer tokens, or sensitive patient or
+donor data. A delivery failure must never weaken or bypass the underlying
+security control. Email, SMS, WhatsApp, and other delivery mechanisms remain
+future work and are not implemented by this integration harness.
 
 ## RLS and ACL matrix
 

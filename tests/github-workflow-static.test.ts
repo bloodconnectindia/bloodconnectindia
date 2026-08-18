@@ -142,3 +142,27 @@ Deno.test("workflow prepares the isolated runtime before database and Edge phase
     }
   }
 });
+
+Deno.test("static safety explicitly enforces both reviewed ACL contracts", () => {
+  for (
+    const required of [
+      "tests/authoritative-acl-adapter-static.test.ts",
+      "tests/task14-integration-components-static.test.ts",
+    ]
+  ) {
+    const occurrences =
+      workflow.match(new RegExp(required.replaceAll(".", "\\."), "g")) ?? [];
+    if (occurrences.length !== 1) {
+      throw new Error(
+        `ACL static test is not explicitly enforced once: ${required}`,
+      );
+    }
+  }
+  if (
+    /deno test[^\n]*(?:\stests\s*$|tests\/\*|--allow-all|-A)/m.test(workflow)
+  ) {
+    throw new Error(
+      "Static safety job does not use an explicit safe-test allowlist",
+    );
+  }
+});

@@ -6,6 +6,8 @@ const files = [
   "supabase/tests/integration/ci/concurrency-replay-local.sh",
   "supabase/tests/integration/ci/concurrency-replay-local.test.ts",
   "supabase/tests/integration/ci/inbucket-recovery-local.test.ts",
+  "supabase/tests/integration/ci/run-rls-acl-cases.sh",
+  "supabase/tests/integration/ci/AUTHORITATIVE_ACL_AND_AUTH_FIXTURE_NOTES.md",
   "scripts/ci/run-disposable-integration-phase.sh",
 ];
 const read = (path: string) => Deno.readTextFile(new URL(path, root));
@@ -48,6 +50,27 @@ Deno.test("authoritative ACL adapter remains exact and fail closed", () => {
     if (!adapter.includes(required)) {
       throw new Error(`ACL fail-closed control missing: ${required}`);
     }
+  }
+});
+
+Deno.test("ACL procedure describes only the exact disposable 57-entry target", () => {
+  const procedure = content.get(files[6])!;
+  const notes = content.get(files[7])!;
+  const combined = `${procedure}\n${notes}`;
+  for (
+    const required of [
+      "exact 57-entry",
+      "additional or missing ACL entry",
+      "disposable",
+      "not a production/live-project ACL inventory",
+    ]
+  ) {
+    if (!combined.toLowerCase().includes(required.toLowerCase())) {
+      throw new Error(`Reviewed ACL wording missing: ${required}`);
+    }
+  }
+  if (combined.includes("It is not currently known")) {
+    throw new Error("Stale unknown ACL-baseline wording remains");
   }
 });
 

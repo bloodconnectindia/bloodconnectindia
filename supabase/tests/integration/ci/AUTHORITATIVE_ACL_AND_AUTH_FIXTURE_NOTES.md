@@ -1,5 +1,13 @@
 # Authoritative ACL and disposable Auth fixture notes
 
+## Disposable operational ACL target
+
+`verified-operational-acl.sql` establishes and verifies exactly 57 expanded
+table ACL entries for the six operational tables. It fails closed if any entry
+is additional, missing, grantable, or otherwise inconsistent with the reviewed
+matrix. This matrix is solely the disposable integration target; it must not be
+treated as an inventory of privileges on any production or live project.
+
 ## Live helper alignment (read-only inventory, 2026-08-14)
 
 `security.current_user_has_role(required_role text)` exists live, is owned by
