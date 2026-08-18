@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login | BloodConnectIndia</title>
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card" aria-labelledby="login-title">
+      <a class="auth-brand" href="../index.html">BloodConnectIndia</a>
+      <p class="eyebrow">Secure account access</p>
+      <h1 id="login-title">Login</h1>
+      <p>Enter your account email and password. Access is determined only after server verification.</p>
+      <form id="common-login-form">
+        <p><label for="login-email">Email</label><input id="login-email" name="email" type="email" autocomplete="username" maxlength="320" required></p>
+        <p><label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="1024" required></p>
+        <div class="auth-actions"><button id="common-login-submit" class="button" type="submit">Login</button><a href="admin-forgot-password.html">Forgot password?</a></div>
+      </form>
+      <p id="common-login-message" class="auth-message" role="alert" aria-live="polite"></p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase-config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/common-login.js"></script>
+</body>
+</html>

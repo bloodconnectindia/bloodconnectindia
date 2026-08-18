@@ -134,8 +134,8 @@ Deno.test("all Supabase pages load the boundary before client bootstrap", async 
     "pages/admin-blood-requests.html", "pages/admin-demo-management.html",
     "pages/admin-blood-banks.html", "pages/admin-hospitals.html",
     "pages/admin-forgot-password.html", "pages/admin-donors.html",
-    "pages/admin-login.html", "pages/admin-reset-password.html",
-    "pages/admin-users.html", "pages/blood-request.html",
+    "pages/admin-reset-password.html",
+    "pages/admin-users.html", "pages/blood-request.html", "pages/login.html",
   ];
   for (const page of pages) {
     const html = await Deno.readTextFile(new URL(page, root));

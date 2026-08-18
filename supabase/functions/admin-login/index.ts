@@ -32,7 +32,7 @@ Deno.serve(async request => {
       }
       await transaction`delete from security.admin_login_attempts where subject_hash=${subject}`
       await transaction`insert into security.authorization_audit_log (event_type, actor_user_id, reason) values ('admin_login_success', ${data.user.id}, 'verified active Admin login')`
-      return reply({ session: data.session })
+      return reply({ session: data.session, verified_identity: { role: 'Admin', status: 'Active' } })
     })
   } catch { return reply({ message: 'Unable to sign in.' }, 500) }
 })

@@ -7,6 +7,7 @@ Required server-only secrets: `SECURITY_HMAC_KEY`, `SUPABASE_DB_URL`, `SUPABASE_
 | Function | Contract |
 | --- | --- |
 | `admin-login` | Validates lock state, authenticates with Supabase Auth, verifies active Admin via `public.users`, atomically records failures/warnings/one-hour locks, audits events, and returns a session only after authorization. |
+| `admin-session-authorization` | Revalidates the bearer session with Supabase Auth and returns a normalized Admin identity only when the authoritative `public.users` row remains active Admin. It performs no role selection or mutation. |
 | `admin-password-reset-request` | Always returns a generic response; server-side joins `auth.users` to active Admin records before requesting the reset email. Requires approved Site URL/redirect configuration. |
 | `submit-blood-request` | Server-validates fields, CAPTCHA token when enabled, HMAC contact/request signals, duplicate/rate/abuse state, warnings, temporary blocks, audit events, then inserts the approved request. |
 | `restore-blood-request-submission` | Requires active authenticated user with `blood_requests.restore_submission`; clears only the relevant temporary state and records actor/reason. |

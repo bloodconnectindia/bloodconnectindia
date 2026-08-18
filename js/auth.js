@@ -1,4 +1,12 @@
 window.BloodConnectAuth = {
+    resolveVerifiedDestination(data) {
+        const identity = data?.verified_identity;
+        if (identity?.role === "Admin" && identity?.status === "Active") {
+            return "admin-dashboard.html";
+        }
+        throw new Error("This account does not have a verified supported destination.");
+    },
+
     async signIn(email, password) {
         const { data, error } = await supabaseClient.functions.invoke("admin-login", {
             body: { email, password }
@@ -12,12 +20,14 @@ window.BloodConnectAuth = {
             throw new Error(data?.message || "Unable to sign in.");
         }
 
+        const destination = this.resolveVerifiedDestination(data);
+
         const { error: sessionError } = await supabaseClient.auth.setSession(data.session);
         if (sessionError) {
             throw new Error("Unable to establish a secure session.");
         }
 
-        return data;
+        return { destination };
     },
 
     async signOut() {
@@ -45,6 +55,15 @@ window.BloodConnectAuth = {
             throw new Error("Please sign in to access this page.");
         }
 
+        return user;
+    },
+
+    async requireVerifiedAdminSession() {
+        const user = await this.requireAuthenticatedSession();
+        const { data, error } = await supabaseClient.functions.invoke("admin-session-authorization");
+        if (error || data?.verified_identity?.role !== "Admin" || data?.verified_identity?.status !== "Active") {
+            throw new Error("This session is not authorized for the Admin workspace.");
+        }
         return user;
     },
 

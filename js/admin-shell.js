@@ -13,8 +13,8 @@ window.BloodConnectAdminShell = (() => {
         toggle.addEventListener("click", () => { const open = document.body.classList.toggle("nav-open"); toggle.setAttribute("aria-expanded", String(open)); });
         document.getElementById("admin-nav-scrim").addEventListener("click", closeNav);
         root.querySelectorAll(".admin-sidebar a").forEach(link => link.addEventListener("click", closeNav));
-        document.getElementById("admin-logout").addEventListener("click", async () => { try { await BloodConnectAuth.signOut(); } finally { window.location.href = "admin-login.html"; } });
-        try { return await BloodConnectAuth.requireAuthenticatedSession(); } catch { window.location.replace("admin-login.html"); return null; }
+        document.getElementById("admin-logout").addEventListener("click", async () => { try { await BloodConnectAuth.signOut(); } finally { window.location.href = "login.html"; } });
+        try { return await BloodConnectAuth.requireVerifiedAdminSession(); } catch { window.location.replace("login.html"); return null; }
     }
     return { init, escape };
 })();

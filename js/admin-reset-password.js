@@ -86,8 +86,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             form.hidden = true;
             await supabaseClient.auth.signOut({ scope: "local" });
             intro.textContent = "Your password was updated successfully.";
-            setMessage("Returning to Admin Login. Sign in again to verify Admin eligibility.", "success");
-            window.setTimeout(() => window.location.replace("admin-login.html"), 1800);
+            setMessage("Returning to Login. Sign in again to verify account eligibility.", "success");
+            window.setTimeout(() => window.location.replace("login.html"), 1800);
         } catch {
             setMessage("The password could not be updated. The recovery link may be expired; request a new link and try again.");
             submit.disabled = false;
