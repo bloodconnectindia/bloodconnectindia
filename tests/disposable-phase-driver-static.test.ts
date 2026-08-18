@@ -47,11 +47,14 @@ Deno.test("driver is approval-gated and loopback-only", () => {
 });
 
 Deno.test("migration discovery is quarantined and restored with checksum verification", () => {
-  const move = driver.indexOf('mv -- supabase/migrations/*.sql "$state_dir/migrations/"');
-  const start = driver.indexOf("supabase start");
-  if (move < 0 || start <= move) throw new Error("Migrations are not quarantined before startup");
-  for (const required of ["manifest.sha256", "sha256sum --check", "mv -- \"$file\" supabase/migrations/"]) if (!cleanup.includes(required)) throw new Error(`Cleanup verification missing: ${required}`);
+  const phase = driver.slice(driver.lastIndexOf("start-local-stack)"));
+  const validation = phase.indexOf("validate_migrations");
+  const move = phase.indexOf('mv -- supabase/migrations/*.sql "$state_dir/migrations/"');
+  const start = phase.indexOf("supabase start");
+  if (validation < 0 || move <= validation || start <= move) throw new Error("Approved hashes are not verified before quarantine/startup");
+  for (const required of ["manifest.sha256", "sha256sum --check", "validate-migration-runner.ps1", "migration-quarantine-not-empty"]) if (!cleanup.includes(required)) throw new Error(`Cleanup verification missing: ${required}`);
   if (!workflow.includes("cleanup-disposable-integration.sh")) throw new Error("Always-run workflow cleanup does not restore migrations");
+  if (/cleanup-disposable-integration\.sh\s*\|\|\s*true/.test(workflow)) throw new Error("Cleanup failure is suppressed");
 });
 
 Deno.test("index is outside a wrapper transaction and ordered before authorization", () => {
@@ -59,7 +62,26 @@ Deno.test("index is outside a wrapper transaction and ordered before authorizati
   const verification = driver.indexOf("verify-identity-index.sql");
   const authorization = driver.indexOf("202608120001_security_authorization_and_request_controls.sql");
   if (index < 0 || verification <= index || authorization <= verification) throw new Error("Controlled index ordering is incorrect");
-  if (/identity-index\)[\s\S]*?begin/i.test(driver.slice(index, authorization))) throw new Error("Concurrent index phase is transaction-wrapped");
+  const phase = driver.slice(driver.lastIndexOf("identity-index)", index), driver.indexOf("authorization-migration)"));
+  if (phase.includes("psql_atomic_file")) throw new Error("Concurrent index phase is transaction-wrapped");
+  for (const required of ["cleanup-failed-identity-index.sql", "identity-index-failed-retry-required", "identity-index-cleanup-refused"]) {
+    if (!driver.includes(required)) throw new Error(`Concurrent index failure control missing: ${required}`);
+  }
+});
+
+Deno.test("approved mutating files use the atomic psql helper only", () => {
+  for (const required of [
+    "psql_atomic_file supabase/tests/integration/ci/disposable-baseline.sql",
+    "psql_atomic_file supabase/tests/integration/ci/auth-identity-adapter.sql",
+    'psql_atomic_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"',
+    'psql_atomic_file "$state_dir/migrations/202608120001_security_authorization_and_request_controls.sql"',
+    'psql_atomic_file "$state_dir/migrations/202608120004_live_aligned_demo_lifecycle.sql"',
+  ]) {
+    if (!driver.includes(required)) throw new Error(`Atomic mutation dispatch missing: ${required}`);
+  }
+  if (!driver.includes("--single-transaction --set=ON_ERROR_STOP=1")) {
+    throw new Error("Atomic psql helper is incomplete");
+  }
 });
 
 Deno.test("no remote-management command, remote URL, or unsanitized output primitive exists", () => {

@@ -10,12 +10,40 @@ $errors = [System.Collections.Generic.List[string]]::new()
 $actualRunnable = @(Get-ChildItem -LiteralPath $migrationRoot -File -Filter '*.sql' |
     Sort-Object Name | ForEach-Object Name)
 $expectedRunnable = @($manifest.runnableMigrations)
+$runnableHashProperties = @($manifest.runnableMigrationSha256.PSObject.Properties)
+$runnableHashNames = @($runnableHashProperties.Name)
 
 if (($actualRunnable -join "`n") -ne ($expectedRunnable -join "`n")) {
     $errors.Add("Runnable migration manifest mismatch. Expected: $($expectedRunnable -join ', '). Actual: $($actualRunnable -join ', ').")
 }
 
+if ((($runnableHashNames | Sort-Object) -join "`n") -ne
+    (($expectedRunnable | Sort-Object) -join "`n")) {
+    $errors.Add('Runnable migration hash inventory must contain exactly one entry for every approved runnable migration.')
+}
+
+foreach ($name in $expectedRunnable) {
+    $path = Join-Path $migrationRoot $name
+    $expectedHash = [string]$manifest.runnableMigrationSha256.$name
+    if ($expectedHash -notmatch '^[0-9A-Fa-f]{64}$') {
+        $errors.Add("Runnable migration has a missing or invalid SHA-256 value: $name")
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        continue
+    }
+    $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+    if ($actualHash -ne $expectedHash) {
+        $errors.Add("Runnable migration checksum mismatch: $name")
+    }
+}
+
 $denylisted = @($manifest.denylistedLegacyMigrations.PSObject.Properties.Name)
+$actualArchived = @(Get-ChildItem -LiteralPath $archiveRoot -File -Filter '*.sql' |
+    Sort-Object Name | ForEach-Object Name)
+if (($actualArchived -join "`n") -ne (($denylisted | Sort-Object) -join "`n")) {
+    $errors.Add('Archived migration hash inventory must contain exactly one entry for every archived SQL migration.')
+}
 foreach ($name in $denylisted) {
     if (Test-Path -LiteralPath (Join-Path $migrationRoot $name)) {
         $errors.Add("Denylisted legacy migration is runnable: $name")

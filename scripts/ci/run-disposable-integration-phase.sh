@@ -25,13 +25,23 @@ for linked in .supabase/project-ref supabase/.temp/project-ref; do [[ ! -s "$lin
 
 export PGOPTIONS="-c bci.test.disposable=approved -c bci.test.run_id=${BCI_TEST_RUN_ID}"
 psql_file() { psql "$db_url" --no-psqlrc --set=ON_ERROR_STOP=1 --file "$1"; }
+psql_atomic_file() { psql "$db_url" --no-psqlrc --single-transaction --set=ON_ERROR_STOP=1 --file "$1"; }
 require_file() { [[ -f "$1" ]] || fail "missing-prerequisite"; }
+validate_migrations() { pwsh -NoProfile -File ./supabase/scripts/validate-migration-runner.ps1; }
+
+cleanup_failed_identity_index() {
+  if ! psql_file supabase/tests/integration/ci/cleanup-failed-identity-index.sql; then
+    fail "identity-index-cleanup-refused" 79
+  fi
+  fail "identity-index-failed-retry-required" 79
+}
 
 case "$phase" in
   start-local-stack)
     require_file supabase/config.toml
     mkdir -p "$state_dir/migrations"
     [[ -z "$(find "$state_dir/migrations" -mindepth 1 -print -quit)" ]] || fail "quarantine-not-empty"
+    validate_migrations
     (cd supabase/migrations && sha256sum -- *.sql) > "$state_dir/manifest.sha256"
     mv -- supabase/migrations/*.sql "$state_dir/migrations/"
     [[ -z "$(find supabase/migrations -name '*.sql' -print -quit)" ]] || fail "automatic-migration-discovery-not-empty"
@@ -40,7 +50,7 @@ case "$phase" in
     ;;
   baseline)
     [[ -f "$state_dir/stack-started" ]] || fail "stack-state-missing"
-    psql_file supabase/tests/integration/ci/disposable-baseline.sql
+    psql_atomic_file supabase/tests/integration/ci/disposable-baseline.sql
     psql_file supabase/tests/integration/00_baseline_assertions.sql
     ;;
   schema-preflight)
@@ -52,13 +62,13 @@ case "$phase" in
     bash supabase/tests/integration/ci/run-negative-identity-cases.sh
     ;;
   identity-clean)
-    psql_file supabase/tests/integration/ci/auth-identity-adapter.sql
+    psql_atomic_file supabase/tests/integration/ci/auth-identity-adapter.sql
     psql_file supabase/staged-migrations/202608120002_users_identity_preflight.sql
     psql_file supabase/staged-migrations/202608120002_users_identity_preflight.sql
     ;;
   identity-foundation)
-    psql_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
-    psql_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
+    psql_atomic_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
+    psql_atomic_file "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
     psql_file supabase/tests/integration/ci/verify-canonical-identity-foundation.sql
     bash supabase/tests/integration/ci/run-canonical-identity-negative-cases.sh \
       "$state_dir/migrations/202608110002_canonical_identity_foundation.sql"
@@ -70,11 +80,12 @@ case "$phase" in
     psql_file supabase/tests/integration/ci/verify-identity-reconciliation-evidence.sql
     ;;
   identity-index)
-    psql_file supabase/staged-migrations/202608120003_users_identity_unique_index.sql
-    psql_file supabase/tests/integration/ci/verify-identity-index.sql
+    require_file supabase/tests/integration/ci/cleanup-failed-identity-index.sql
+    psql_file supabase/staged-migrations/202608120003_users_identity_unique_index.sql || cleanup_failed_identity_index
+    psql_file supabase/tests/integration/ci/verify-identity-index.sql || cleanup_failed_identity_index
     ;;
   authorization-migration)
-    psql_file "$state_dir/migrations/202608120001_security_authorization_and_request_controls.sql"
+    psql_atomic_file "$state_dir/migrations/202608120001_security_authorization_and_request_controls.sql"
     ;;
   authorization-verification)
     psql_file supabase/tests/integration/03_post_security_verification.sql
@@ -82,7 +93,7 @@ case "$phase" in
     bash supabase/tests/integration/ci/run-rls-acl-cases.sh authorization
     ;;
   demo-migration)
-    psql_file "$state_dir/migrations/202608120004_live_aligned_demo_lifecycle.sql"
+    psql_atomic_file "$state_dir/migrations/202608120004_live_aligned_demo_lifecycle.sql"
     ;;
   demo-verification)
     psql_file supabase/tests/integration/04_post_demo_verification.sql

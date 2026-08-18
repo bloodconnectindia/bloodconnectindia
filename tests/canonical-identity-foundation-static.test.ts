@@ -6,6 +6,9 @@ const verification = await read("supabase/tests/integration/ci/verify-canonical-
 const negativeCases = await read("supabase/tests/integration/ci/run-canonical-identity-negative-cases.sh");
 const manifest = JSON.parse(await read("supabase/migration-manifest.json"));
 const driver = await read("scripts/ci/run-disposable-integration-phase.sh");
+const failedIndexCleanup = await read(
+  "supabase/tests/integration/ci/cleanup-failed-identity-index.sql",
+);
 
 Deno.test("canonical identity foundation is ordered before authorization", () => {
   const expected = [
@@ -87,4 +90,23 @@ Deno.test("guarded disposable cases reject alternate incompatible identity objec
     if (!negativeCases.includes(guard)) throw new Error(`Negative identity runner lacks local guard: ${guard}`);
   }
   if (!driver.includes("run-canonical-identity-negative-cases.sh")) throw new Error("Disposable driver does not run negative identity cases");
+});
+
+Deno.test("failed concurrent legacy-identity index cleanup is exact and fail closed", () => {
+  for (const required of [
+    "public.users_user_id_unique_nonnull_idx",
+    "tbl.relname = 'users'",
+    "a.attname = 'user_id'",
+    "not i.indisvalid or not i.indisready",
+    "drop index concurrently public.users_user_id_unique_nonnull_idx",
+    "Refusing cleanup",
+    "\\quit 79",
+  ]) {
+    if (!failedIndexCleanup.includes(required)) {
+      throw new Error(`Failed-index cleanup safeguard missing: ${required}`);
+    }
+  }
+  if (/drop\s+index\s+concurrently\s+(?!public\.users_user_id_unique_nonnull_idx)/i.test(failedIndexCleanup)) {
+    throw new Error("Failed-index cleanup has a non-approved DROP target");
+  }
 });

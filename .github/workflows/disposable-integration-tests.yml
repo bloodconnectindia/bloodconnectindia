@@ -37,7 +37,7 @@ jobs:
           deno-version: 2.8.1
 
       - name: Validate workflow and harness statically
-        run: deno test --allow-read=. tests/authoritative-schema-preflight-static.test.ts tests/canonical-identity-foundation-static.test.ts tests/identity-reconciliation-evidence.test.ts tests/integration-harness-static.test.ts tests/github-workflow-static.test.ts
+        run: deno test --allow-read=. tests/authoritative-schema-preflight-static.test.ts tests/canonical-identity-foundation-static.test.ts tests/identity-reconciliation-evidence.test.ts tests/integration-harness-static.test.ts tests/migration-integrity-static.test.ts tests/disposable-phase-driver-static.test.ts tests/github-workflow-static.test.ts
 
   disposable-integration:
     name: Runner-local Supabase integration
@@ -120,6 +120,21 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          supabase stop --no-backup 2>/dev/null || true
-          docker ps -aq --filter label=com.supabase.cli.project | xargs -r docker rm -f >/dev/null 2>&1 || true
-          bash scripts/ci/cleanup-disposable-integration.sh || true
+          set +e
+          shutdown_status=0
+          fallback_status=0
+          restoration_status=0
+          supabase stop --no-backup 2>/dev/null || shutdown_status=$?
+          disposable_ids="$(docker ps -aq --filter label=com.supabase.cli.project=bloodconnectindia-disposable-ci)" || fallback_status=$?
+          if [[ $fallback_status -eq 0 && -n "$disposable_ids" ]]; then
+            docker rm -f $disposable_ids >/dev/null 2>&1 || fallback_status=$?
+          fi
+          bash scripts/ci/cleanup-disposable-integration.sh || restoration_status=$?
+          if [[ $restoration_status -ne 0 ]]; then
+            echo "Migration restoration or approved-hash verification failed." >&2
+            exit "$restoration_status"
+          fi
+          if [[ $shutdown_status -ne 0 && $fallback_status -ne 0 ]]; then
+            echo "Both normal and fallback disposable stack cleanup failed." >&2
+            exit "$fallback_status"
+          fi

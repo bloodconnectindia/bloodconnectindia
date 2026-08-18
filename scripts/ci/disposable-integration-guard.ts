@@ -48,4 +48,75 @@ for (const path of requiredReadinessFiles) {
 }
 if (missing.length) throw new Error(`Database execution is intentionally blocked pending reviewed readiness files: ${missing.join(", ")}`);
 
+const manifest = JSON.parse(
+  await Deno.readTextFile("supabase/migration-manifest.json"),
+) as {
+  runnableMigrations?: string[];
+  runnableMigrationSha256?: Record<string, string>;
+  denylistedLegacyMigrations?: Record<string, string>;
+};
+const approvedOrder = [
+  "202608110001_authoritative_schema_preflight.sql",
+  "202608110002_canonical_identity_foundation.sql",
+  "202608120001_security_authorization_and_request_controls.sql",
+  "202608120004_live_aligned_demo_lifecycle.sql",
+];
+if (JSON.stringify(manifest.runnableMigrations) !== JSON.stringify(approvedOrder)) {
+  throw new Error("Runnable migration order or filename inventory is not approved");
+}
+const actualRunnable = [];
+for await (const entry of Deno.readDir("supabase/migrations")) {
+  if (entry.isFile && entry.name.endsWith(".sql")) actualRunnable.push(entry.name);
+}
+actualRunnable.sort();
+if (JSON.stringify(actualRunnable) !== JSON.stringify(approvedOrder)) {
+  throw new Error("Runnable migration directory inventory is not exact");
+}
+const approvedHashes = manifest.runnableMigrationSha256 ?? {};
+if (
+  JSON.stringify(Object.keys(approvedHashes).sort()) !==
+    JSON.stringify([...approvedOrder].sort())
+) {
+  throw new Error("Runnable migration hash inventory is not exact");
+}
+const sha256 = async (path: string) => {
+  const bytes = await Deno.readFile(path);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("").toUpperCase();
+};
+for (const name of approvedOrder) {
+  const expected = approvedHashes[name];
+  if (!/^[0-9A-F]{64}$/.test(expected ?? "")) {
+    throw new Error(`Runnable migration hash is missing or invalid: ${name}`);
+  }
+  if (await sha256(`supabase/migrations/${name}`) !== expected) {
+    throw new Error(`Runnable migration checksum mismatch: ${name}`);
+  }
+}
+const archivedHashes = manifest.denylistedLegacyMigrations ?? {};
+const archivedDirectory =
+  "supabase/legacy-migrations/incompatible-profiles-user-roles";
+const archivedFiles = [];
+for await (const entry of Deno.readDir(archivedDirectory)) {
+  if (entry.isFile && entry.name.endsWith(".sql")) archivedFiles.push(entry.name);
+}
+archivedFiles.sort();
+if (
+  JSON.stringify(archivedFiles) !==
+    JSON.stringify(Object.keys(archivedHashes).sort())
+) {
+  throw new Error("Archived migration hash inventory is not exact");
+}
+for (const [name, expected] of Object.entries(archivedHashes)) {
+  if (!/^[0-9A-F]{64}$/.test(expected)) {
+    throw new Error(`Archived migration hash is invalid: ${name}`);
+  }
+  const path = `${archivedDirectory}/${name}`;
+  if (await sha256(path) !== expected) {
+    throw new Error(`Archived migration checksum mismatch: ${name}`);
+  }
+}
+
 console.log("Local-only safety and readiness gate passed without displaying credentials.");

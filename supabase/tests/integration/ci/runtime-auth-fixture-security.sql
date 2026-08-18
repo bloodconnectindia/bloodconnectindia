@@ -1,6 +1,8 @@
 \ir ../_disposable_guard.sql
 -- Future disposable-only linkage for the credentialed explicit-deny fixture.
 -- The Auth user itself is created through the supported runner-local Admin API.
+begin;
+
 insert into security.user_permission_overrides
   (user_id, permission_key, effect, reason, granted_by_user_id)
 select u.user_id, p.permission_key, 'deny', 'runner-local explicit-deny fixture', null
@@ -18,3 +20,5 @@ do $$ begin
     raise exception 'Disposable explicit-deny fixture linkage failed';
   end if;
 end $$;
+
+commit;
