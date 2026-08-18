@@ -156,3 +156,23 @@ Capture test names, pass/fail counts, schema versions, non-secret row counts,
 and migration hashes. Then destroy the disposable database/project and revoke
 its disposable credentials. Do not retain Auth tokens or database dumps unless
 separately approved and securely handled.
+# Disposable runtime preparation
+
+After `start-local-stack`, run the guarded `runtime-environment` phase before
+the baseline or any Edge Function phase. It verifies the CLI-reported endpoints
+are loopback-only, creates run-scoped secret material under `RUNNER_TEMP`, and
+starts the local Edge Function runtime with that temporary environment file.
+Cleanup stops that process and removes all temporary credential material.
+
+On Windows, use `scripts/local/run-disposable-integration-phase.ps1`. The
+wrapper resolves and verifies bundled Deno 2.8.1, Supabase CLI 2.101.0, psql
+17.11, Git Bash, and sha256sum by explicit executable path, then passes those
+paths only to the child process. It does not modify user or system PATH. The
+Linux CI runner retains its normal command-name fallback.
+
+The Edge integration phase includes an `admin-session-authorization` matrix:
+active Admin succeeds with the normalized verified identity; ordinary and
+inactive users fail; missing or invalid bearer credentials fail; and changing
+the dedicated Admin fixture to inactive after token issuance fails closed. The
+fixture is restored in a `finally` block, with authoritative teardown remaining
+the final cleanup boundary if the runtime test is interrupted.

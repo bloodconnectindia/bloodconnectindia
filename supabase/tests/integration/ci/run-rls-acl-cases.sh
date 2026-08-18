@@ -2,6 +2,7 @@
 set -euo pipefail
 
 [[ "${BCI_DATABASE_URL:-}" == postgresql://postgres:postgres@127.0.0.1:54322/postgres ]] || exit 65
+readonly psql_bin="${BCI_PSQL_BIN:-psql}"
 scope="${1:-}"
 case "$scope" in authorization|demo) ;; *) exit 64 ;; esac
 
@@ -16,7 +17,7 @@ for required in "$acl_adapter" "$rls_cases"; do
     exit 78
   fi
 done
-psql "$BCI_DATABASE_URL" --no-psqlrc --single-transaction --set=ON_ERROR_STOP=1 --file "$acl_adapter" >/dev/null
+"$psql_bin" "$BCI_DATABASE_URL" --no-psqlrc --single-transaction --set=ON_ERROR_STOP=1 --file "$acl_adapter" >/dev/null
 if [[ "$scope" == authorization ]]; then
   :
 else
@@ -24,5 +25,5 @@ else
 fi
 is_demo=false
 [[ "$scope" == demo ]] && is_demo=true
-psql "$BCI_DATABASE_URL" --no-psqlrc --set=ON_ERROR_STOP=1 --set="bci_scope=$scope" --set="bci_is_demo=$is_demo" --file "$rls_cases" >/dev/null
+"$psql_bin" "$BCI_DATABASE_URL" --no-psqlrc --set=ON_ERROR_STOP=1 --set="bci_scope=$scope" --set="bci_is_demo=$is_demo" --file "$rls_cases" >/dev/null
 echo "{\"phase\":\"${scope}-verification\",\"status\":\"passed\",\"evidence\":\"acl-and-policy-assertions\"}"

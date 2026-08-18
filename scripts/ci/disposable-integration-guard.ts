@@ -23,6 +23,8 @@ const forbiddenEnvironmentNames = [
   "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_URL",
   "DATABASE_URL", "PRODUCTION_DATABASE_URL", "LIVE_PROJECT_REF",
   "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY",
+  "BCI_LOCAL_SUPABASE_URL", "BCI_LOCAL_ANON_KEY",
+  "BCI_LOCAL_SERVICE_ROLE_KEY",
 ];
 for (const name of forbiddenEnvironmentNames) {
   if (Deno.env.get(name)) throw new Error(`Forbidden credential/environment variable is configured: ${name}`);
@@ -41,6 +43,7 @@ const requiredReadinessFiles = [
   "supabase/config.toml",
   "supabase/tests/integration/ci/disposable-baseline.sql",
   "supabase/tests/integration/ci/PHASE_DRIVER_APPROVED",
+  "scripts/ci/prepare-disposable-runtime-env.ts",
 ];
 const missing: string[] = [];
 for (const path of requiredReadinessFiles) {

@@ -8,12 +8,19 @@ const required = (name: string) => {
   return value;
 };
 const anonKey = required("BCI_LOCAL_ANON_KEY");
+const serviceKey = required("BCI_LOCAL_SERVICE_ROLE_KEY");
 const adminEmail = required("BCI_TEST_ADMIN_EMAIL");
 const adminPassword = required("BCI_TEST_ADMIN_PASSWORD");
 const inactiveEmail = required("BCI_TEST_INACTIVE_EMAIL");
 const inactivePassword = required("BCI_TEST_INACTIVE_PASSWORD");
 const ordinaryEmail = required("BCI_TEST_ORDINARY_EMAIL");
 const ordinaryPassword = required("BCI_TEST_ORDINARY_PASSWORD");
+const sessionRevalidationEmail = required(
+  "BCI_TEST_SESSION_REVALIDATION_EMAIL",
+);
+const sessionRevalidationPassword = required(
+  "BCI_TEST_SESSION_REVALIDATION_PASSWORD",
+);
 
 type Json = Record<string, unknown>;
 const post = async (
@@ -91,6 +98,97 @@ const authToken = async (email: string, password: string) => {
   }
 };
 
+const sessionAuthorization = async (
+  token?: string,
+  includeAuthorization = true,
+) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const headers: Record<string, string> = {
+      apikey: anonKey,
+      "content-type": "application/json",
+      origin,
+    };
+    if (includeAuthorization) headers.authorization = `Bearer ${token ?? ""}`;
+    const response = await fetch(`${base}/admin-session-authorization`, {
+      method: "POST",
+      signal: controller.signal,
+      headers,
+      body: "{}",
+    });
+    let body: Json = {};
+    try {
+      body = await response.json() as Json;
+    } catch { /* status and exact success body are asserted */ }
+    return { status: response.status, body };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const tokenSubject = (token: string) => {
+  const encoded = token.split(".")[1] ?? "";
+  const normalized = encoded.replaceAll("-", "+").replaceAll("_", "/")
+    .padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+  let subject = "";
+  try {
+    subject = String((JSON.parse(atob(normalized)) as Json).sub ?? "");
+  } catch { /* rejected below without displaying token material */ }
+  if (!/^[0-9a-f-]{36}$/i.test(subject)) {
+    throw new Error("Disposable session subject is malformed");
+  }
+  return subject;
+};
+
+const serviceHeaders = {
+  apikey: serviceKey,
+  authorization: `Bearer ${serviceKey}`,
+  "content-type": "application/json",
+};
+const serviceFetch = async (url: string, init: RequestInit = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+const deleteMapping = async (userId: string) => {
+  const response = await serviceFetch(
+    `http://127.0.0.1:54321/rest/v1/users?user_id=eq.${
+      encodeURIComponent(userId)
+    }`,
+    { method: "DELETE", headers: serviceHeaders },
+  );
+  assert(response.ok, "Disposable identity mapping deletion failed");
+};
+const insertMapping = async (
+  userId: string,
+  role: "Admin",
+  status: "Active" | "Inactive",
+) => {
+  const response = await serviceFetch("http://127.0.0.1:54321/rest/v1/users", {
+    method: "POST",
+    headers: { ...serviceHeaders, prefer: "return=minimal" },
+    body: JSON.stringify({ user_id: userId, role, status }),
+  });
+  assert(response.ok, "Disposable identity mapping insertion failed");
+};
+const mappingIsRestored = async (userId: string) => {
+  const response = await serviceFetch(
+    `http://127.0.0.1:54321/rest/v1/users?select=user_id,role,status&user_id=eq.${
+      encodeURIComponent(userId)
+    }`,
+    { headers: serviceHeaders },
+  );
+  if (!response.ok) return false;
+  const rows = await response.json() as Json[];
+  return rows.length === 1 && rows[0].user_id === userId &&
+    rows[0].role === "Admin" && rows[0].status === "Active";
+};
+
 Deno.test({
   name:
     "CORS is pinned to APP_ORIGIN and rejects protected cross-origin demo requests",
@@ -133,6 +231,59 @@ Deno.test("admin login is generic for malformed, inactive, ordinary, and invalid
     );
     assert(!("session" in result.json), "Rejected login returned a session");
   }
+});
+
+Deno.test("admin session authorization revalidates active authoritative identity and normalizes its response", async () => {
+  const admin = await authToken(adminEmail, adminPassword);
+  const active = await sessionAuthorization(admin);
+  assert(active.status === 200, "Active Admin session was rejected");
+  assert(
+    JSON.stringify(active.body) ===
+      JSON.stringify({
+        verified_identity: { role: "Admin", status: "Active" },
+      }),
+    "Verified Admin identity was not exactly normalized",
+  );
+
+  const ordinary = await authToken(ordinaryEmail, ordinaryPassword);
+  assert(
+    (await sessionAuthorization(ordinary)).status === 403,
+    "Ordinary session was authorized",
+  );
+  const inactive = await authToken(inactiveEmail, inactivePassword);
+  assert(
+    (await sessionAuthorization(inactive)).status === 403,
+    "Inactive session was authorized",
+  );
+  assert(
+    (await sessionAuthorization(undefined, false)).status === 401,
+    "Missing bearer session was accepted",
+  );
+  assert(
+    (await sessionAuthorization("invalid-disposable-token")).status === 401,
+    "Invalid bearer session was accepted",
+  );
+
+  const revalidationToken = await authToken(
+    sessionRevalidationEmail,
+    sessionRevalidationPassword,
+  );
+  const userId = tokenSubject(revalidationToken);
+  try {
+    await deleteMapping(userId);
+    await insertMapping(userId, "Admin", "Inactive");
+    assert(
+      (await sessionAuthorization(revalidationToken)).status === 403,
+      "Previously issued session ignored inactive authoritative mapping",
+    );
+  } finally {
+    await deleteMapping(userId);
+    await insertMapping(userId, "Admin", "Active");
+  }
+  assert(
+    await mappingIsRestored(userId),
+    "Session-revalidation mapping restoration failed",
+  );
 });
 
 Deno.test("three serialized failed Admin logins lock and a successful login resets prior failures", async () => {

@@ -68,6 +68,15 @@ const fixtures: Fixture[] = [
     emailEnv: "BCI_TEST_ADMIN_EMAIL",
   },
   {
+    label: "session-revalidation-admin",
+    email: "runner-session-revalidation@bci.invalid",
+    role: "Admin",
+    status: "Active",
+    category: "session-revalidation",
+    passwordEnv: "BCI_TEST_SESSION_REVALIDATION_PASSWORD",
+    emailEnv: "BCI_TEST_SESSION_REVALIDATION_EMAIL",
+  },
+  {
     label: "future-super-admin",
     email: "runner-super-admin@bci.invalid",
     role: "Super Admin",

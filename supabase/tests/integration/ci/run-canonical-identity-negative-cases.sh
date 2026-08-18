@@ -3,6 +3,7 @@ set -euo pipefail
 
 readonly db_url="${BCI_DATABASE_URL:-}"
 readonly migration="${1:-}"
+readonly psql_bin="${BCI_PSQL_BIN:-psql}"
 
 [[ "${BCI_DISPOSABLE_APPROVAL:-}" == approved ]] || exit 78
 [[ "${BCI_DATABASE_HOST:-}" == 127.0.0.1 && "${BCI_DATABASE_PORT:-}" == 54322 && "${BCI_DATABASE_NAME:-}" == postgres ]] || exit 78
@@ -13,7 +14,7 @@ expect_rejected() {
   local setup_sql="$1"
   local result
   set +e
-  result="$({ printf '%s\n' 'begin;' "$setup_sql"; printf '\\ir %s\n' "$migration"; } | psql "$db_url" --no-psqlrc --set=ON_ERROR_STOP=1 2>&1)"
+  result="$({ printf '%s\n' 'begin;' "$setup_sql"; printf '\\ir %s\n' "$migration"; } | "$psql_bin" "$db_url" --no-psqlrc --set=ON_ERROR_STOP=1 2>&1)"
   local status=$?
   set -e
   [[ $status -ne 0 ]] || return 1

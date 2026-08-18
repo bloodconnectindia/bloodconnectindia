@@ -24,6 +24,7 @@ Deno.test("bootstrap contains the required fake identity categories", () => {
       "ordinary-active",
       "inactive-user",
       "admin",
+      "session-revalidation-admin",
       "future-super-admin",
       "explicitly-denied-admin",
       "demo-only",
@@ -39,7 +40,7 @@ Deno.test("bootstrap contains the required fake identity categories", () => {
     match[1]
   );
   if (
-    emails.length < 8 || emails.some((email) => !email.endsWith("@bci.invalid"))
+    emails.length < 9 || emails.some((email) => !email.endsWith("@bci.invalid"))
   ) throw new Error("Non-reserved fixture email found");
   if (
     /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
