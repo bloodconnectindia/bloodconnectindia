@@ -37,7 +37,7 @@ jobs:
           deno-version: 2.8.1
 
       - name: Validate workflow and harness statically
-        run: deno test --allow-read=. tests/authoritative-schema-preflight-static.test.ts tests/canonical-identity-foundation-static.test.ts tests/identity-reconciliation-evidence.test.ts tests/integration-harness-static.test.ts tests/migration-integrity-static.test.ts tests/disposable-phase-driver-static.test.ts tests/github-workflow-static.test.ts tests/disposable-runtime-env-static.test.ts tests/local-tool-resolution-static.test.ts tests/admin-session-runtime-static.test.ts tests/authoritative-acl-adapter-static.test.ts tests/task14-integration-components-static.test.ts
+        run: deno test --allow-read=. tests/authoritative-schema-preflight-static.test.ts tests/canonical-identity-foundation-static.test.ts tests/identity-reconciliation-evidence.test.ts tests/integration-harness-static.test.ts tests/migration-integrity-static.test.ts tests/disposable-phase-driver-static.test.ts tests/compose-loopback-static.test.ts tests/github-workflow-static.test.ts tests/disposable-runtime-env-static.test.ts tests/local-tool-resolution-static.test.ts tests/admin-session-runtime-static.test.ts tests/authoritative-acl-adapter-static.test.ts tests/task14-integration-components-static.test.ts
 
   disposable-integration:
     name: Runner-local Supabase integration
@@ -51,7 +51,6 @@ jobs:
       BCI_DATABASE_HOST: 127.0.0.1
       BCI_DATABASE_PORT: "54322"
       BCI_DATABASE_NAME: postgres
-      BCI_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - name: Checkout exact task revision
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -62,11 +61,6 @@ jobs:
         uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
         with:
           deno-version: 2.8.1
-
-      - name: Install pinned Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
-        with:
-          version: 2.101.0
 
       - name: Hard local-only safety and readiness gate
         env:
@@ -118,25 +112,7 @@ jobs:
         if: ${{ always() }}
         run: deno run --allow-env --allow-write="$GITHUB_STEP_SUMMARY" scripts/ci/write-integration-summary.ts
 
-      - name: Always stop and remove runner-local stack
+      - name: Always stop, remove, and restore runner-local state
         if: ${{ always() }}
         shell: bash
-        run: |
-          set +e
-          shutdown_status=0
-          fallback_status=0
-          restoration_status=0
-          supabase stop --no-backup 2>/dev/null || shutdown_status=$?
-          disposable_ids="$(docker ps -aq --filter label=com.supabase.cli.project=bloodconnectindia-disposable-ci)" || fallback_status=$?
-          if [[ $fallback_status -eq 0 && -n "$disposable_ids" ]]; then
-            docker rm -f $disposable_ids >/dev/null 2>&1 || fallback_status=$?
-          fi
-          bash scripts/ci/cleanup-disposable-integration.sh || restoration_status=$?
-          if [[ $restoration_status -ne 0 ]]; then
-            echo "Migration restoration or approved-hash verification failed." >&2
-            exit "$restoration_status"
-          fi
-          if [[ $shutdown_status -ne 0 && $fallback_status -ne 0 ]]; then
-            echo "Both normal and fallback disposable stack cleanup failed." >&2
-            exit "$fallback_status"
-          fi
+        run: bash scripts/ci/cleanup-disposable-integration.sh

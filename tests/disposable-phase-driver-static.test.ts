@@ -124,17 +124,62 @@ Deno.test("driver is approval-gated and loopback-only", () => {
   }
 });
 
+Deno.test("every runtime-backed phase requires centralized trusted stack state first", () => {
+  const protectedPhases = [
+    "runtime-environment",
+    "baseline",
+    "schema-preflight",
+    "identity-negative",
+    "identity-clean",
+    "identity-foundation",
+    "identity-evidence",
+    "identity-index",
+    "authorization-migration",
+    "authorization-verification",
+    "demo-migration",
+    "demo-verification",
+    "auth-fixtures",
+    "edge-functions",
+    "concurrency-replay",
+    "password-recovery",
+  ];
+  if (
+    !driver.includes(
+      'require_trusted_stack() { [[ -f "$state_dir/stack-started" ]] || fail "stack-state-missing"; }',
+    )
+  ) {
+    throw new Error(
+      "Centralized trusted-stack helper is missing or does not fail closed",
+    );
+  }
+  const dispatcher = driver.slice(driver.lastIndexOf('case "$phase" in'));
+  for (const phase of protectedPhases) {
+    const match = dispatcher.match(
+      new RegExp(
+        `(?:^|\\n)  ${phase.replaceAll("-", "\\-")}\\)\\n    ([^\\n]+)`,
+      ),
+    );
+    if (!match || match[1].trim() !== "require_trusted_stack") {
+      throw new Error(`Trusted-stack guard is not first in phase: ${phase}`);
+    }
+  }
+  const start = dispatcher.match(/(?:^|\n)  start-local-stack\)\n    ([^\n]+)/);
+  if (!start || start[1].trim() === "require_trusted_stack") {
+    throw new Error(
+      "Stack creation must remain callable before trusted stack state exists",
+    );
+  }
+});
+
 Deno.test("dedicated Docker network is exact and verified before startup", () => {
   const phase = driver.slice(driver.lastIndexOf("start-local-stack)"));
   const inspect = phase.indexOf('"$docker_bin" network inspect "$network_id"');
   const binding = phase.indexOf(
     '[[ "$network_binding" == 127.0.0.1 ]]',
   );
-  const start = phase.indexOf(
-    '"$supabase_bin" start --network-id "$network_id"',
-  );
+  const start = phase.indexOf("compose up --detach --wait");
   if (inspect < 0 || binding <= inspect || start <= binding) {
-    throw new Error("Loopback network is not verified before Supabase startup");
+    throw new Error("Loopback network is not verified before Compose startup");
   }
   for (
     const required of [
@@ -148,8 +193,8 @@ Deno.test("dedicated Docker network is exact and verified before startup", () =>
       throw new Error(`Dedicated network guard missing: ${required}`);
     }
   }
-  if (/"\$supabase_bin" start(?:\s|$)(?!\s*--network-id)/m.test(driver)) {
-    throw new Error("Supabase startup can omit the dedicated network");
+  if (driver.includes('"$supabase_bin" start')) {
+    throw new Error("Legacy Supabase startup remains executable");
   }
 });
 
@@ -172,7 +217,7 @@ Deno.test("migration discovery is quarantined and restored with checksum verific
   const move = phase.indexOf(
     'mv -- supabase/migrations/*.sql "$state_dir/migrations/"',
   );
-  const start = phase.indexOf('"$supabase_bin" start');
+  const start = phase.indexOf("compose up --detach --wait");
   if (validation < 0 || move <= validation || start <= move) {
     throw new Error(
       "Approved hashes are not verified before quarantine/startup",
@@ -181,7 +226,7 @@ Deno.test("migration discovery is quarantined and restored with checksum verific
   for (
     const required of [
       "manifest.sha256",
-      "sha256sum --check",
+      "restoration-checksum-failed",
       "validate-migration-runner.ps1",
       "migration-quarantine-not-empty",
     ]
@@ -266,5 +311,8 @@ Deno.test("no remote-management command, remote URL, or unsanitized output primi
   }
   if (!driver.includes("result()") || !driver.includes('"status"')) {
     throw new Error("Structured phase result missing");
+  }
+  if (driver.includes("BCI_SUPABASE_BIN") || driver.includes("supabase_bin")) {
+    throw new Error("Unused Supabase CLI runtime dependency remains");
   }
 });

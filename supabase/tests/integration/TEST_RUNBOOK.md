@@ -39,12 +39,11 @@ without both settings. The guard supplements—not replaces—human target revie
 
 ### Required local services
 
-This suite requires PostgreSQL, Kong/API gateway, Auth, PostgREST, Edge
-Runtime/local function serving, and InBucket. Studio is optional for automated
-execution. Vector may be unhealthy or restarting on Windows without blocking
-this specific disposable suite because its current assertions do not depend on
-Vector. This exemption is limited to the current suite and must be reconsidered
-if future logging or analytics assertions depend on Vector.
+This suite requires PostgreSQL, Kong/API gateway, Auth, the Auth migration job,
+PostgREST, Edge Runtime/local function serving, and Mailpit. Studio, Meta,
+Realtime, Storage, imgproxy, Analytics, Vector, and Pooler are intentionally
+omitted. Future logging or analytics assertions require a separately reviewed
+topology change rather than silently enabling omitted services.
 
 ## Exact controlled order
 

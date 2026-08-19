@@ -33,14 +33,6 @@ function Resolve-ApprovedTool {
 $deno = Resolve-ApprovedTool 'deno' @(
     (Join-Path $repoRoot '.tools\deno-recovered\deno.exe')
 )
-$supabase = Resolve-ApprovedTool 'supabase' @(
-    (Join-Path $repoRoot '.tools\supabase\supabase.exe'),
-    'C:\Users\Jagdamb\AppData\Local\Programs\SupabaseCLI\2.101.0\supabase.exe',
-    (Join-Path $env:LOCALAPPDATA 'Supabase\supabase.exe'),
-    (Join-Path $env:USERPROFILE '.local\bin\supabase.exe'),
-    'C:\Tools\Supabase\2.101.0\supabase.exe',
-    'C:\Program Files\Supabase CLI\supabase.exe'
-)
 $psql = Resolve-ApprovedTool 'psql' @(
     (Join-Path $repoRoot '.tools\postgresql-17\bin\psql.exe'),
     'C:\Users\Jagdamb\AppData\Local\Programs\PostgreSQLClient\17.11\bin\psql.exe',
@@ -63,9 +55,6 @@ $cygpath = Resolve-ApprovedTool 'cygpath' @(
 if ((& $deno --version | Select-Object -First 1) -ne 'deno 2.8.1 (stable, release, x86_64-pc-windows-msvc)') {
     throw 'Bundled Deno version is not exactly 2.8.1'
 }
-if ((& $supabase --version).Trim() -ne '2.101.0') {
-    throw 'Supabase CLI version is not exactly 2.101.0'
-}
 if ((& $psql --version) -notmatch '^psql \(PostgreSQL\) 17\.11(?:\s|$)') {
     throw 'psql version is not exactly 17.11'
 }
@@ -74,6 +63,10 @@ if ((& $docker version --format '{{.Client.Version}}').Trim() -ne '29.7.2') {
 }
 if ((& $docker version --format '{{.Server.Version}}').Trim() -ne '29.7.2') {
     throw 'Docker Server version is not exactly 29.7.2'
+}
+$composeVersion = (& $docker compose version --short).Trim()
+if ($composeVersion -notmatch '^v?2\.[0-9]+\.[0-9]+$') {
+    throw 'Docker Compose v2 is unavailable from the approved Docker executable'
 }
 if ((& $bash --version | Select-Object -First 1) -notmatch '^GNU bash, version ') {
     throw 'Approved Git Bash could not be verified'
@@ -91,7 +84,7 @@ if (-not (Test-Path -LiteralPath $githubEnv)) {
 
 foreach ($line in Get-Content -LiteralPath $githubEnv) {
     if (-not $line) { continue }
-    if ($line -notmatch '^(BCI_LOCAL_SUPABASE_URL|BCI_LOCAL_ANON_KEY|BCI_LOCAL_SERVICE_ROLE_KEY)=([^\r\n]+)$') {
+    if ($line -notmatch '^(BCI_RUNTIME_DIR|BCI_DATABASE_URL|BCI_LOCAL_SUPABASE_URL|BCI_LOCAL_ANON_KEY|BCI_LOCAL_SERVICE_ROLE_KEY)=([^\r\n]+)$') {
         throw 'Local disposable environment state contains an unexpected entry'
     }
     [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
@@ -105,11 +98,12 @@ $toBashPath = {
 }
 
 $env:BCI_DENO_BIN = & $toBashPath $deno
-$env:BCI_SUPABASE_BIN = & $toBashPath $supabase
 $env:BCI_PSQL_BIN = & $toBashPath $psql
 $env:BCI_SHA256SUM_BIN = & $toBashPath $sha256sum
 $env:BCI_DOCKER_BIN = & $toBashPath $docker
 $env:BCI_TEST_RUN_ID = $RunId
+$env:BCI_RUNNER_TEMP_NATIVE = $localTemp
+$env:BCI_GITHUB_ENV_NATIVE = $githubEnv
 $env:RUNNER_TEMP = & $toBashPath $localTemp
 $env:GITHUB_ENV = & $toBashPath $githubEnv
 

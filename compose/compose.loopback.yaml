@@ -1,0 +1,256 @@
+name: bloodconnectindia-disposable-ci
+
+x-security: &service-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    <<: *service-security
+    image: supabase/postgres:17.6.1.106@sha256:5e52ca81790ae3aa1c2f8c20df41dd96404c8ab29632dddf113b881de785ee92
+    platform: linux/amd64
+    restart: unless-stopped
+    env_file:
+      - path: ${BCI_RUNTIME_DIR:?runtime-directory-required}/stack.env
+        required: true
+    entrypoint:
+      - /bin/sh
+      - /opt/bci/postgres-entrypoint.sh
+    ports:
+      - name: postgres-loopback
+        target: 5432
+        published: "54322"
+        host_ip: 127.0.0.1
+        protocol: tcp
+        app_protocol: postgresql
+        mode: host
+    volumes:
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./runtime/postgres-entrypoint.sh
+        target: /opt/bci/postgres-entrypoint.sh
+        read_only: true
+      - type: bind
+        source: ./vendor/supabase-cli/schema.sql
+        target: /opt/bci/bootstrap/01-schema.sql
+        read_only: true
+      - type: bind
+        source: ./vendor/supabase-cli/webhook.sql
+        target: /opt/bci/bootstrap/02-webhook.sql
+        read_only: true
+      - type: bind
+        source: ./vendor/supabase-cli/_supabase.sql
+        target: /opt/bci/bootstrap/03-supabase.sql
+        read_only: true
+      - type: bind
+        source: ${BCI_RUNTIME_DIR:?runtime-directory-required}/pgsodium_root.key
+        target: /run/secrets/pgsodium_root_key
+        read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - postgres
+        - -h
+        - 127.0.0.1
+        - -p
+        - "5432"
+      interval: 10s
+      timeout: 2s
+      retries: 12
+      start_period: 20s
+    networks:
+      loopback:
+        aliases:
+          - db
+
+  auth-migration:
+    <<: *service-security
+    image: supabase/gotrue:v2.188.1@sha256:61f1099e790c4f364b70d6fb92cc07e5f90275abf2cf690ff045c63f1d96ee4b
+    platform: linux/amd64
+    restart: "no"
+    read_only: true
+    env_file:
+      - path: ${BCI_RUNTIME_DIR:?runtime-directory-required}/stack.env
+        required: true
+    command:
+      - gotrue
+      - migrate
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    networks:
+      loopback: {}
+
+  auth:
+    <<: *service-security
+    image: supabase/gotrue:v2.188.1@sha256:61f1099e790c4f364b70d6fb92cc07e5f90275abf2cf690ff045c63f1d96ee4b
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    env_file:
+      - path: ${BCI_RUNTIME_DIR:?runtime-directory-required}/stack.env
+        required: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    depends_on:
+      auth-migration:
+        condition: service_completed_successfully
+        restart: true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://127.0.0.1:9999/health
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      loopback:
+        aliases:
+          - auth
+
+  rest:
+    <<: *service-security
+    image: postgrest/postgrest:v14.10@sha256:78c0a947ae556093def31de0b76c37d36ca09394d603a6e61785f4c0008aeb12
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    env_file:
+      - path: ${BCI_RUNTIME_DIR:?runtime-directory-required}/stack.env
+        required: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    networks:
+      loopback:
+        aliases:
+          - rest
+
+  edge-runtime:
+    <<: *service-security
+    image: supabase/edge-runtime:v1.73.13@sha256:e8ddc7b0f4888818159d4b665e922de667948e2864c895ed62acdfd29e7c6c80
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    env_file:
+      - path: ${BCI_RUNTIME_DIR:?runtime-directory-required}/stack.env
+        required: true
+    command:
+      - edge-runtime
+      - start
+      - --main-service=/root
+      - --port=8081
+      - --policy=per_worker
+    volumes:
+      - type: bind
+        source: ./vendor/supabase-cli/main.ts
+        target: /root/index.ts
+        read_only: true
+      - type: bind
+        source: ../supabase/functions
+        target: /home/deno/functions
+        read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      auth:
+        condition: service_healthy
+        restart: true
+      rest:
+        condition: service_started
+        restart: true
+    networks:
+      loopback:
+        aliases:
+          - edge-runtime
+
+  mailpit:
+    <<: *service-security
+    image: axllent/mailpit:v1.22.3@sha256:168f762c218e167ba88ae7e48194126eb5ba5e99ef652063e3f14f9c4f0ee70f
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    ports:
+      - name: mailpit-loopback
+        target: 8025
+        published: "54324"
+        host_ip: 127.0.0.1
+        protocol: tcp
+        app_protocol: http
+        mode: host
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    networks:
+      loopback:
+        aliases:
+          - mailpit
+
+  kong:
+    <<: *service-security
+    image: kong:2.8.1@sha256:e21b0b793879ab96720ed4188f9441260273f4bf775bcbff8d435e019ffb759a
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /run/bci/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+    ports:
+      - name: api-loopback
+        target: 8000
+        published: "54321"
+        host_ip: 127.0.0.1
+        protocol: tcp
+        app_protocol: http
+        mode: host
+    volumes:
+      - type: bind
+        source: ${BCI_RUNTIME_DIR:?runtime-directory-required}/kong.yml
+        target: /run/bci/kong.yml
+        read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+      - /usr/local/kong:rw,nosuid,nodev
+    depends_on:
+      auth:
+        condition: service_healthy
+        restart: true
+      rest:
+        condition: service_started
+        restart: true
+      edge-runtime:
+        condition: service_started
+        restart: true
+    networks:
+      loopback:
+        aliases:
+          - kong
+
+volumes:
+  postgres-data:
+    name: bloodconnectindia-disposable-db-${BCI_TEST_RUN_ID:?run-id-required}
+
+networks:
+  loopback:
+    external: true
+    name: bloodconnectindia-disposable-loopback

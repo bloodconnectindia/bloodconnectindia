@@ -33,7 +33,7 @@ Deno.test("workflow is manual-only, serialized, time-limited, and has teardown",
       "concurrency:",
       "cancel-in-progress: false",
       "if: ${{ always() }}",
-      "supabase stop --no-backup",
+      "bash scripts/ci/cleanup-disposable-integration.sh",
     ]
   ) {
     if (!workflow.includes(required)) {
@@ -54,13 +54,26 @@ Deno.test("actions and runtimes are fixed versions", () => {
     const required of [
       "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
       "denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282",
-      "supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf",
       "deno-version: 2.8.1",
-      "version: 2.101.0",
     ]
   ) {
     if (!workflow.includes(required)) {
       throw new Error(`Missing fixed version: ${required}`);
+    }
+  }
+});
+
+Deno.test("workflow has no Supabase CLI runtime dependency", () => {
+  for (
+    const forbidden of [
+      "supabase/setup-cli",
+      "Install pinned Supabase CLI",
+      "BCI_SUPABASE_BIN",
+      "supabase_bin",
+    ]
+  ) {
+    if (workflow.includes(forbidden)) {
+      throw new Error(`Supabase CLI runtime dependency remains: ${forbidden}`);
     }
   }
 });

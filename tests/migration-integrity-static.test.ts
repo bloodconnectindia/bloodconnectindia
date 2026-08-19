@@ -104,7 +104,7 @@ Deno.test("ACL and persistent explicit-deny mutations are atomic", () => {
 Deno.test("restoration failure is visible and approved hashes are revalidated", () => {
   for (
     const required of [
-      "sha256sum --check",
+      '"$sha256sum_bin" --check',
       "validate-migration-runner.ps1",
       "migration-quarantine-not-empty",
       "migration-restore-collision",
@@ -118,14 +118,14 @@ Deno.test("restoration failure is visible and approved hashes are revalidated", 
   if (/cleanup-disposable-integration\.sh\s*\|\|\s*true/.test(workflow)) {
     throw new Error("Workflow suppresses restoration failure");
   }
-  for (const required of ["restoration_status", 'exit "$restoration_status"']) {
-    if (!workflow.includes(required)) {
-      throw new Error(
-        `Workflow restoration status handling missing: ${required}`,
-      );
-    }
+  if (
+    !workflow.includes("run: bash scripts/ci/cleanup-disposable-integration.sh")
+  ) {
+    throw new Error(
+      "Workflow does not directly propagate cleanup/restoration failure",
+    );
   }
-  const trap = cleanup.indexOf("trap cleanup_runtime_materials EXIT");
+  const trap = cleanup.indexOf("trap emergency_secret_cleanup EXIT");
   const restoration = cleanup.indexOf('if [[ -d "$state_dir/migrations" ]]');
   if (trap < 0 || restoration <= trap) {
     throw new Error(
@@ -134,9 +134,10 @@ Deno.test("restoration failure is visible and approved hashes are revalidated", 
   }
   for (
     const required of [
-      "cleanup_entry_status=$?",
+      "first_failure=0",
+      "record_failure()",
       "temporary-secret-cleanup-failed",
-      'exit "$cleanup_entry_status"',
+      'exit "$first_failure"',
     ]
   ) {
     if (!cleanup.includes(required)) {

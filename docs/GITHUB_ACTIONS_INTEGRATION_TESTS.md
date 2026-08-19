@@ -23,7 +23,7 @@ tables whose columns have not been verified are empty relations used solely to
 exercise migration policies. `blood_requests` contains only the five fields
 evidenced by prepared server functions. This is not a production-schema export.
 
-Before `supabase start`, the driver hashes and moves the four controlled runnable
+Before Compose startup, the driver hashes and moves the four controlled runnable
 migrations into a run-specific directory under `RUNNER_TEMP`: authoritative
 schema preflight (`202608110001`), canonical identity foundation (`202608110002`),
 authorization and request controls (`202608120001`), and demo lifecycle
@@ -33,14 +33,22 @@ the quarantined exact files explicitly. The always-run cleanup restores them and
 verifies their original SHA-256 hashes. Any nonempty quarantine or checksum
 mismatch fails closed.
 
+Cleanup attempts every mandatory component and records failures in execution
+order. The first nonzero status is the final exit status; later Compose,
+restoration, validation, state-removal, and temporary-secret failures are still
+reported but cannot replace that first failure. Failed partial Compose starts
+retain `compose-start-attempted` until exact-project teardown succeeds.
+
 ## Approval-marker review
 
 A human may authorize creation of `PHASE_DRIVER_APPROVED` only after reviewing:
 
 1. The disposable baseline against an authoritative schema inventory.
-2. The pinned CLI's acceptance of `supabase/config.toml` in a disposable dry run.
+2. Canonical `compose/source-manifest.json` integrity, exact vendored Git-blob
+   hashes, helper hashes, and all six `tag@platform-digest` image pins.
 3. Migration quarantine/restore behavior and exact migration hashes.
-4. All loopback, environment, link-state, and fixed-port guards.
+4. All loopback, environment, link-state, fixed-port, listener, and post-start
+   Docker binding guards.
 5. Negative identity rollback and concurrent-index predicate checks.
 6. Authorization/demo assertions and their expected-denial isolation.
 7. The prepared local Edge Function, bounded concurrency/replay, recovery, and
@@ -98,11 +106,10 @@ driver must:
 
 1. Temporarily prevent automatic migration discovery before local stack startup.
 2. Start only the required runner-local PostgreSQL, Kong/API gateway, Auth,
-   PostgREST, Edge Runtime/local function serving, and InBucket services. Studio
-   is optional for automation. Vector may be unhealthy or restarting on Windows
-   without blocking this specific suite because no current assertion depends on
-   Vector. This narrow exemption must be reconsidered if logging or analytics
-   assertions later depend on Vector.
+   Auth migration, PostgREST, Edge Runtime/local function serving, and Mailpit
+   services. Studio, Meta, Realtime, Storage, imgproxy, Analytics, Vector, and
+   Pooler are omitted. The only host publications are Kong on `127.0.0.1:54321`,
+   PostgreSQL on `127.0.0.1:54322`, and Mailpit UI on `127.0.0.1:54324`.
 3. Validate and install the approved disposable baseline.
 4. Apply the authoritative schema preflight (`202608110001`) and fail closed on
    any incompatible live-aligned schema or identity assumption.
@@ -121,7 +128,7 @@ driver must:
 10. Apply authorization and request controls (`202608120001`), then run the
     authorization/RLS/ACL/audit tests.
 11. Apply demo lifecycle (`202608120004`), then run the demo lifecycle tests.
-12. Run local Edge Function, two-session concurrency/replay, and InBucket recovery tests.
+12. Run local Edge Function, two-session concurrency/replay, and Mailpit recovery tests.
 
 The phase driver must stop at the first failure and must never silently skip a
 prerequisite.

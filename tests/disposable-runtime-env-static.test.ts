@@ -100,8 +100,8 @@ Deno.test("runtime secret paths remain below disposable temp storage", () => {
 Deno.test("runtime preparation and cleanup never expose secret material", () => {
   for (
     const required of [
-      "trap cleanup_runtime_materials EXIT",
-      "cleanup_entry_status=$?",
+      "trap emergency_secret_cleanup EXIT",
+      "first_failure=0",
       "temporary-secret-cleanup-failed",
     ]
   ) {
@@ -113,10 +113,10 @@ Deno.test("runtime preparation and cleanup never expose secret material", () => 
   }
   for (
     const required of [
-      '"$supabase_bin" status -o env',
-      "BCI_SUPABASE_STATUS_FILE",
-      "bci-runtime-env-",
-      "functions serve --env-file",
+      "prepare-compose-runtime.ts",
+      "bci-compose-",
+      "compose up --detach --wait",
+      "runtime-secret-preparation-failed",
     ]
   ) {
     if (!driver.includes(required)) {
@@ -132,6 +132,9 @@ Deno.test("runtime preparation and cleanup never expose secret material", () => 
       '"$runner_temp/bci-edge-functions-$run_id.env"',
       '"$runner_temp/bci-edge-functions-$run_id.log"',
       '"$edge_pid_file"',
+      '"$runtime_dir/stack.env"',
+      '"$runtime_dir/kong.yml"',
+      '"$runtime_dir/pgsodium_root.key"',
     ]
   ) {
     if (!cleanup.includes(temporary)) {
