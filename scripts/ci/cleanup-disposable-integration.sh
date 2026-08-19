@@ -11,6 +11,30 @@ readonly state_dir="$runner_temp/bci-controlled-migrations-$run_id"
 readonly edge_pid_file="$runner_temp/bci-edge-functions-$run_id.pid"
 runtime_cleanup_status=0
 
+cleanup_runtime_materials() {
+  local cleanup_entry_status=$?
+  local secret_cleanup_status=0
+  trap - EXIT
+  set +e
+  rm -f -- \
+    "$runner_temp/bci-auth-fixtures-$run_id.json" \
+    "$runner_temp/bci-supabase-status-$run_id.env" \
+    "$runner_temp/bci-runtime-env-$run_id.env" \
+    "$runner_temp/bci-process-env-$run_id.env" \
+    "$runner_temp/bci-edge-functions-$run_id.env" \
+    "$runner_temp/bci-edge-functions-$run_id.log" \
+    "$edge_pid_file"
+  secret_cleanup_status=$?
+  if (( secret_cleanup_status != 0 )); then
+    echo '{"phase":"cleanup","status":"failed","reason":"temporary-secret-cleanup-failed"}' >&2
+    if (( cleanup_entry_status == 0 )); then
+      cleanup_entry_status=79
+    fi
+  fi
+  exit "$cleanup_entry_status"
+}
+trap cleanup_runtime_materials EXIT
+
 if [[ -f "$edge_pid_file" ]]; then
   edge_pid="$(tr -d '\r\n' < "$edge_pid_file")"
   if [[ ! "$edge_pid" =~ ^[0-9]+$ ]]; then
@@ -51,13 +75,6 @@ fi
 
 pwsh -NoProfile -File ./supabase/scripts/validate-migration-runner.ps1
 
-rm -f -- \
-  "$runner_temp/bci-auth-fixtures-$run_id.json" \
-  "$runner_temp/bci-supabase-status-$run_id.env" \
-  "$runner_temp/bci-runtime-env-$run_id.env" \
-  "$runner_temp/bci-process-env-$run_id.env" \
-  "$runner_temp/bci-edge-functions-$run_id.log" \
-  "$edge_pid_file"
 rm -f -- "$state_dir/manifest.sha256" "$state_dir/stack-started" "$state_dir/runtime-prepared"
 if [[ -d "$state_dir" ]]; then
   [[ -z "$(find "$state_dir" -mindepth 1 -print -quit)" ]] || {

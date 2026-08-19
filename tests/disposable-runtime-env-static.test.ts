@@ -100,6 +100,19 @@ Deno.test("runtime secret paths remain below disposable temp storage", () => {
 Deno.test("runtime preparation and cleanup never expose secret material", () => {
   for (
     const required of [
+      "trap cleanup_runtime_materials EXIT",
+      "cleanup_entry_status=$?",
+      "temporary-secret-cleanup-failed",
+    ]
+  ) {
+    if (!cleanup.includes(required)) {
+      throw new Error(
+        `Unconditional secret cleanup control missing: ${required}`,
+      );
+    }
+  }
+  for (
+    const required of [
       '"$supabase_bin" status -o env',
       "BCI_SUPABASE_STATUS_FILE",
       "bci-runtime-env-",
@@ -112,10 +125,13 @@ Deno.test("runtime preparation and cleanup never expose secret material", () => 
   }
   for (
     const temporary of [
-      "bci-supabase-status-",
-      "bci-runtime-env-",
-      "bci-process-env-",
-      "bci-edge-functions-",
+      '"$runner_temp/bci-auth-fixtures-$run_id.json"',
+      '"$runner_temp/bci-supabase-status-$run_id.env"',
+      '"$runner_temp/bci-runtime-env-$run_id.env"',
+      '"$runner_temp/bci-process-env-$run_id.env"',
+      '"$runner_temp/bci-edge-functions-$run_id.env"',
+      '"$runner_temp/bci-edge-functions-$run_id.log"',
+      '"$edge_pid_file"',
     ]
   ) {
     if (!cleanup.includes(temporary)) {

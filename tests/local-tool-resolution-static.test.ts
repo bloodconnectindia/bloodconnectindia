@@ -10,6 +10,8 @@ Deno.test("Windows wrapper pins every approved tool without PATH mutation", () =
   for (
     const required of [
       ".tools\\deno-recovered\\deno.exe",
+      "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\SupabaseCLI\\2.101.0\\supabase.exe",
+      "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\PostgreSQLClient\\17.11\\bin\\psql.exe",
       "deno 2.8.1",
       "2.101.0",
       "PostgreSQL\\) 17\\.11",

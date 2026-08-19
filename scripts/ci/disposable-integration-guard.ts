@@ -8,32 +8,62 @@ const required = {
 };
 
 for (const [name, expected] of Object.entries(required)) {
-  if (Deno.env.get(name) !== expected) throw new Error(`Safety guard rejected ${name}`);
+  if (Deno.env.get(name) !== expected) {
+    throw new Error(`Safety guard rejected ${name}`);
+  }
 }
 
 const runId = Deno.env.get("BCI_TEST_RUN_ID") || "";
-if (!/^bci-local-[0-9]+-[0-9]+$/.test(runId)) throw new Error("Invalid disposable run ID");
+if (!/^bci-local-[0-9]+-[0-9]+$/.test(runId)) {
+  throw new Error("Invalid disposable run ID");
+}
 
 const databaseUrl = new URL(Deno.env.get("BCI_DATABASE_URL") || "invalid:");
-if (databaseUrl.protocol !== "postgresql:" || !["127.0.0.1", "localhost", "::1"].includes(databaseUrl.hostname) || databaseUrl.port !== "54322" || databaseUrl.pathname !== "/postgres") {
+if (
+  databaseUrl.protocol !== "postgresql:" ||
+  !["127.0.0.1", "localhost", "::1"].includes(databaseUrl.hostname) ||
+  databaseUrl.port !== "54322" || databaseUrl.pathname !== "/postgres"
+) {
   throw new Error("Database URL is not the runner-local Supabase database");
 }
 
 const forbiddenEnvironmentNames = [
-  "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_URL",
-  "DATABASE_URL", "PRODUCTION_DATABASE_URL", "LIVE_PROJECT_REF",
-  "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY",
-  "BCI_LOCAL_SUPABASE_URL", "BCI_LOCAL_ANON_KEY",
+  "SUPABASE_ACCESS_TOKEN",
+  "SUPABASE_PROJECT_REF",
+  "SUPABASE_DB_URL",
+  "DATABASE_URL",
+  "PRODUCTION_DATABASE_URL",
+  "LIVE_PROJECT_REF",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "BCI_LOCAL_SUPABASE_URL",
+  "BCI_LOCAL_ANON_KEY",
   "BCI_LOCAL_SERVICE_ROLE_KEY",
 ];
 for (const name of forbiddenEnvironmentNames) {
-  if (Deno.env.get(name)) throw new Error(`Forbidden credential/environment variable is configured: ${name}`);
+  if (Deno.env.get(name)) {
+    throw new Error(
+      `Forbidden credential/environment variable is configured: ${name}`,
+    );
+  }
 }
 
-for (const path of [".supabase/project-ref", "supabase/.temp/project-ref", ".env", ".env.local", ".env.production"]) {
+for (
+  const path of [
+    ".supabase/project-ref",
+    "supabase/.temp/project-ref",
+    ".env",
+    ".env.local",
+    ".env.production",
+  ]
+) {
   try {
     const value = (await Deno.readTextFile(path)).trim();
-    if (value) throw new Error(`Remote-link or environment file must be absent in CI: ${path}`);
+    if (value) {
+      throw new Error(
+        `Remote-link or environment file must be absent in CI: ${path}`,
+      );
+    }
   } catch (error) {
     if (!(error instanceof Deno.errors.NotFound)) throw error;
   }
@@ -47,9 +77,20 @@ const requiredReadinessFiles = [
 ];
 const missing: string[] = [];
 for (const path of requiredReadinessFiles) {
-  try { await Deno.stat(path); } catch (error) { if (error instanceof Deno.errors.NotFound) missing.push(path); else throw error; }
+  try {
+    await Deno.stat(path);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) missing.push(path);
+    else throw error;
+  }
 }
-if (missing.length) throw new Error(`Database execution is intentionally blocked pending reviewed readiness files: ${missing.join(", ")}`);
+if (missing.length) {
+  throw new Error(
+    `Database execution is intentionally blocked pending reviewed readiness files: ${
+      missing.join(", ")
+    }`,
+  );
+}
 
 const manifest = JSON.parse(
   await Deno.readTextFile("supabase/migration-manifest.json"),
@@ -64,12 +105,18 @@ const approvedOrder = [
   "202608120001_security_authorization_and_request_controls.sql",
   "202608120004_live_aligned_demo_lifecycle.sql",
 ];
-if (JSON.stringify(manifest.runnableMigrations) !== JSON.stringify(approvedOrder)) {
-  throw new Error("Runnable migration order or filename inventory is not approved");
+if (
+  JSON.stringify(manifest.runnableMigrations) !== JSON.stringify(approvedOrder)
+) {
+  throw new Error(
+    "Runnable migration order or filename inventory is not approved",
+  );
 }
 const actualRunnable = [];
 for await (const entry of Deno.readDir("supabase/migrations")) {
-  if (entry.isFile && entry.name.endsWith(".sql")) actualRunnable.push(entry.name);
+  if (entry.isFile && entry.name.endsWith(".sql")) {
+    actualRunnable.push(entry.name);
+  }
 }
 actualRunnable.sort();
 if (JSON.stringify(actualRunnable) !== JSON.stringify(approvedOrder)) {
@@ -103,7 +150,9 @@ const archivedDirectory =
   "supabase/legacy-migrations/incompatible-profiles-user-roles";
 const archivedFiles = [];
 for await (const entry of Deno.readDir(archivedDirectory)) {
-  if (entry.isFile && entry.name.endsWith(".sql")) archivedFiles.push(entry.name);
+  if (entry.isFile && entry.name.endsWith(".sql")) {
+    archivedFiles.push(entry.name);
+  }
 }
 archivedFiles.sort();
 if (
@@ -122,4 +171,6 @@ for (const [name, expected] of Object.entries(archivedHashes)) {
   }
 }
 
-console.log("Local-only safety and readiness gate passed without displaying credentials.");
+console.log(
+  "Local-only safety and readiness gate passed without displaying credentials.",
+);

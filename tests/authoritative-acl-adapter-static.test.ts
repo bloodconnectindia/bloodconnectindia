@@ -44,13 +44,19 @@ Deno.test("authoritative adapter contains the exact six-table grant matrix", () 
       throw new Error(`Missing privilege: ${privilege}`);
     }
   }
-  if (!/grant select, insert, update, delete, truncate, references, trigger, maintain[\s\S]*?to postgres;/i.test(adapter)) {
+  if (
+    !/grant select, insert, update, delete, truncate, references, trigger, maintain[\s\S]*?to postgres;/i
+      .test(adapter)
+  ) {
     throw new Error("Exact postgres grant matrix missing");
   }
   if (!/grant select[\s\S]*?to authenticated;/i.test(adapter)) {
     throw new Error("Exact authenticated grant matrix missing");
   }
-  if (!/grant select, insert, delete on table public\.users to service_role;/i.test(adapter)) {
+  if (
+    !/grant select, insert, delete on table public\.users to service_role;/i
+      .test(adapter)
+  ) {
     throw new Error("Exact service_role grant matrix missing");
   }
   for (const forbidden of ["to public", "to anon", "with grant option"]) {

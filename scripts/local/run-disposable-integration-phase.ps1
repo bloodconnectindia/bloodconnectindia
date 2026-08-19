@@ -35,6 +35,7 @@ $deno = Resolve-ApprovedTool 'deno' @(
 )
 $supabase = Resolve-ApprovedTool 'supabase' @(
     (Join-Path $repoRoot '.tools\supabase\supabase.exe'),
+    'C:\Users\Jagdamb\AppData\Local\Programs\SupabaseCLI\2.101.0\supabase.exe',
     (Join-Path $env:LOCALAPPDATA 'Supabase\supabase.exe'),
     (Join-Path $env:USERPROFILE '.local\bin\supabase.exe'),
     'C:\Tools\Supabase\2.101.0\supabase.exe',
@@ -42,6 +43,7 @@ $supabase = Resolve-ApprovedTool 'supabase' @(
 )
 $psql = Resolve-ApprovedTool 'psql' @(
     (Join-Path $repoRoot '.tools\postgresql-17\bin\psql.exe'),
+    'C:\Users\Jagdamb\AppData\Local\Programs\PostgreSQLClient\17.11\bin\psql.exe',
     'C:\Program Files\PostgreSQL\17\bin\psql.exe',
     'C:\Program Files\PostgreSQL\17.11\bin\psql.exe',
     'C:\Tools\PostgreSQL\17.11\bin\psql.exe'

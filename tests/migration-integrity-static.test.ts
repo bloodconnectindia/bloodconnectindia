@@ -5,7 +5,9 @@ const validator = await read("supabase/scripts/validate-migration-runner.ps1");
 const guard = await read("scripts/ci/disposable-integration-guard.ts");
 const driver = await read("scripts/ci/run-disposable-integration-phase.sh");
 const cleanup = await read("scripts/ci/cleanup-disposable-integration.sh");
-const workflow = await read(".github/workflows/disposable-integration-tests.yml");
+const workflow = await read(
+  ".github/workflows/disposable-integration-tests.yml",
+);
 const aclRunner = await read(
   "supabase/tests/integration/ci/run-rls-acl-cases.sh",
 );
@@ -63,12 +65,14 @@ Deno.test("runnable migration order and approved hashes are exact", async () => 
 
 Deno.test("both readiness guards verify runnable and archived content", () => {
   for (const text of [validator, guard]) {
-    for (const required of [
-      "runnableMigrationSha256",
-      "Runnable migration",
-      "denylistedLegacyMigrations",
-      "checksum mismatch",
-    ]) {
+    for (
+      const required of [
+        "runnableMigrationSha256",
+        "Runnable migration",
+        "denylistedLegacyMigrations",
+        "checksum mismatch",
+      ]
+    ) {
       if (!text.includes(required)) {
         throw new Error(`Migration integrity guard missing: ${required}`);
       }
@@ -80,7 +84,9 @@ Deno.test("both readiness guards verify runnable and archived content", () => {
     'mv -- supabase/migrations/*.sql "$state_dir/migrations/"',
   );
   if (validation < 0 || quarantine <= validation) {
-    throw new Error("Driver does not validate approved hashes before quarantine");
+    throw new Error(
+      "Driver does not validate approved hashes before quarantine",
+    );
   }
 });
 
@@ -89,18 +95,22 @@ Deno.test("ACL and persistent explicit-deny mutations are atomic", () => {
     throw new Error("57-entry ACL adapter is not atomic");
   }
   if (!/^begin;$/m.test(explicitDeny) || !/^commit;$/m.test(explicitDeny)) {
-    throw new Error("Persistent explicit-deny fixture is not transaction wrapped");
+    throw new Error(
+      "Persistent explicit-deny fixture is not transaction wrapped",
+    );
   }
 });
 
 Deno.test("restoration failure is visible and approved hashes are revalidated", () => {
-  for (const required of [
-    "sha256sum --check",
-    "validate-migration-runner.ps1",
-    "migration-quarantine-not-empty",
-    "migration-restore-collision",
-    "cleanup-state-not-empty",
-  ]) {
+  for (
+    const required of [
+      "sha256sum --check",
+      "validate-migration-runner.ps1",
+      "migration-quarantine-not-empty",
+      "migration-restore-collision",
+      "cleanup-state-not-empty",
+    ]
+  ) {
     if (!cleanup.includes(required)) {
       throw new Error(`Cleanup safeguard missing: ${required}`);
     }
@@ -108,9 +118,29 @@ Deno.test("restoration failure is visible and approved hashes are revalidated", 
   if (/cleanup-disposable-integration\.sh\s*\|\|\s*true/.test(workflow)) {
     throw new Error("Workflow suppresses restoration failure");
   }
-  for (const required of ["restoration_status", "exit \"$restoration_status\""]) {
+  for (const required of ["restoration_status", 'exit "$restoration_status"']) {
     if (!workflow.includes(required)) {
-      throw new Error(`Workflow restoration status handling missing: ${required}`);
+      throw new Error(
+        `Workflow restoration status handling missing: ${required}`,
+      );
+    }
+  }
+  const trap = cleanup.indexOf("trap cleanup_runtime_materials EXIT");
+  const restoration = cleanup.indexOf('if [[ -d "$state_dir/migrations" ]]');
+  if (trap < 0 || restoration <= trap) {
+    throw new Error(
+      "Temporary-secret cleanup trap is not installed before restoration",
+    );
+  }
+  for (
+    const required of [
+      "cleanup_entry_status=$?",
+      "temporary-secret-cleanup-failed",
+      'exit "$cleanup_entry_status"',
+    ]
+  ) {
+    if (!cleanup.includes(required)) {
+      throw new Error(`Cleanup exit-status preservation missing: ${required}`);
     }
   }
 });
