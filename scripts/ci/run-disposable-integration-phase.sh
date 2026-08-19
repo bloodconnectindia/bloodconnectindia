@@ -8,6 +8,8 @@ readonly deno_bin="${BCI_DENO_BIN:-deno}"
 readonly supabase_bin="${BCI_SUPABASE_BIN:-supabase}"
 readonly psql_bin="${BCI_PSQL_BIN:-psql}"
 readonly sha256sum_bin="${BCI_SHA256SUM_BIN:-sha256sum}"
+readonly docker_bin="${BCI_DOCKER_BIN:-docker}"
+readonly network_id="bloodconnectindia-disposable-loopback"
 phase="${1:-}"
 
 case "$phase" in
@@ -18,6 +20,9 @@ esac
 result() { printf '{"phase":"%s","status":"%s"}\n' "$phase" "$1"; }
 fail() { printf '{"phase":"%s","status":"failed","reason":"%s"}\n' "$phase" "$1" >&2; exit "${2:-78}"; }
 [[ -f "$marker" ]] || fail "approval-marker-missing" 78
+read -r driver_hash _ < <("$sha256sum_bin" -- "$0") || fail "driver-hash-unavailable" 78
+[[ "$driver_hash" =~ ^[0-9a-fA-F]{64}$ ]] || fail "driver-hash-invalid" 78
+[[ "$(<"$marker")" == "driver-sha256:${driver_hash,,}" ]] || fail "approval-marker-stale" 78
 [[ "${BCI_DISPOSABLE_APPROVAL:-}" == approved ]] || fail "approval-variable-missing"
 [[ "${BCI_DATABASE_HOST:-}" == 127.0.0.1 && "${BCI_DATABASE_PORT:-}" == 54322 && "${BCI_DATABASE_NAME:-}" == postgres ]] || fail "target-components-rejected"
 [[ "${BCI_TEST_RUN_ID:-}" =~ ^bci-local-[0-9]+-[0-9]+$ ]] || fail "run-id-rejected"
@@ -43,13 +48,17 @@ cleanup_failed_identity_index() {
 case "$phase" in
   start-local-stack)
     require_file supabase/config.toml
+    network_binding="$("$docker_bin" network inspect "$network_id" \
+      --format '{{ index .Options "com.docker.network.bridge.host_binding_ipv4" }}' 2>/dev/null)" || \
+      fail "disposable-network-missing"
+    [[ "$network_binding" == 127.0.0.1 ]] || fail "disposable-network-binding-rejected"
     mkdir -p "$state_dir/migrations"
     [[ -z "$(find "$state_dir/migrations" -mindepth 1 -print -quit)" ]] || fail "quarantine-not-empty"
     validate_migrations
     (cd supabase/migrations && "$sha256sum_bin" -- *.sql) > "$state_dir/manifest.sha256"
     mv -- supabase/migrations/*.sql "$state_dir/migrations/"
     [[ -z "$(find supabase/migrations -name '*.sql' -print -quit)" ]] || fail "automatic-migration-discovery-not-empty"
-    "$supabase_bin" start
+    "$supabase_bin" start --network-id "$network_id"
     touch "$state_dir/stack-started"
     ;;
   runtime-environment)

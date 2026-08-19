@@ -12,9 +12,12 @@ Deno.test("Windows wrapper pins every approved tool without PATH mutation", () =
       ".tools\\deno-recovered\\deno.exe",
       "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\SupabaseCLI\\2.101.0\\supabase.exe",
       "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\PostgreSQLClient\\17.11\\bin\\psql.exe",
+      "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe",
       "deno 2.8.1",
       "2.101.0",
       "PostgreSQL\\) 17\\.11",
+      "Docker Client version is not exactly 29.7.2",
+      "Docker Server version is not exactly 29.7.2",
       "Git\\bin\\bash.exe",
       "usr\\bin\\sha256sum.exe",
       "usr\\bin\\cygpath.exe",
@@ -49,6 +52,7 @@ Deno.test("tool paths are process scoped and Git Bash converted", () => {
       "BCI_SUPABASE_BIN",
       "BCI_PSQL_BIN",
       "BCI_SHA256SUM_BIN",
+      "BCI_DOCKER_BIN",
     ]
   ) {
     if (!wrapper.includes(`$env:${variable}`) || !driver.includes(variable)) {
@@ -74,6 +78,7 @@ Deno.test("Linux runner keeps command-name fallbacks", () => {
       "${BCI_SUPABASE_BIN:-supabase}",
       "${BCI_PSQL_BIN:-psql}",
       "${BCI_SHA256SUM_BIN:-sha256sum}",
+      "${BCI_DOCKER_BIN:-docker}",
     ]
   ) {
     if (!driver.includes(fallback)) {

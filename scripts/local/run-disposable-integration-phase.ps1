@@ -48,6 +48,9 @@ $psql = Resolve-ApprovedTool 'psql' @(
     'C:\Program Files\PostgreSQL\17.11\bin\psql.exe',
     'C:\Tools\PostgreSQL\17.11\bin\psql.exe'
 )
+$docker = Resolve-ApprovedTool 'docker' @(
+    'C:\Program Files\Docker\Docker\resources\bin\docker.exe'
+)
 $bash = Resolve-ApprovedTool 'bash' @('C:\Program Files\Git\bin\bash.exe')
 $gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
 $sha256sum = Resolve-ApprovedTool 'sha256sum' @(
@@ -65,6 +68,12 @@ if ((& $supabase --version).Trim() -ne '2.101.0') {
 }
 if ((& $psql --version) -notmatch '^psql \(PostgreSQL\) 17\.11(?:\s|$)') {
     throw 'psql version is not exactly 17.11'
+}
+if ((& $docker version --format '{{.Client.Version}}').Trim() -ne '29.7.2') {
+    throw 'Docker Client version is not exactly 29.7.2'
+}
+if ((& $docker version --format '{{.Server.Version}}').Trim() -ne '29.7.2') {
+    throw 'Docker Server version is not exactly 29.7.2'
 }
 if ((& $bash --version | Select-Object -First 1) -notmatch '^GNU bash, version ') {
     throw 'Approved Git Bash could not be verified'
@@ -99,6 +108,7 @@ $env:BCI_DENO_BIN = & $toBashPath $deno
 $env:BCI_SUPABASE_BIN = & $toBashPath $supabase
 $env:BCI_PSQL_BIN = & $toBashPath $psql
 $env:BCI_SHA256SUM_BIN = & $toBashPath $sha256sum
+$env:BCI_DOCKER_BIN = & $toBashPath $docker
 $env:BCI_TEST_RUN_ID = $RunId
 $env:RUNNER_TEMP = & $toBashPath $localTemp
 $env:GITHUB_ENV = & $toBashPath $githubEnv

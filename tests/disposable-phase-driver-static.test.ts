@@ -124,6 +124,48 @@ Deno.test("driver is approval-gated and loopback-only", () => {
   }
 });
 
+Deno.test("dedicated Docker network is exact and verified before startup", () => {
+  const phase = driver.slice(driver.lastIndexOf("start-local-stack)"));
+  const inspect = phase.indexOf('"$docker_bin" network inspect "$network_id"');
+  const binding = phase.indexOf(
+    '[[ "$network_binding" == 127.0.0.1 ]]',
+  );
+  const start = phase.indexOf(
+    '"$supabase_bin" start --network-id "$network_id"',
+  );
+  if (inspect < 0 || binding <= inspect || start <= binding) {
+    throw new Error("Loopback network is not verified before Supabase startup");
+  }
+  for (
+    const required of [
+      'readonly network_id="bloodconnectindia-disposable-loopback"',
+      "com.docker.network.bridge.host_binding_ipv4",
+      'fail "disposable-network-missing"',
+      'fail "disposable-network-binding-rejected"',
+    ]
+  ) {
+    if (!driver.includes(required)) {
+      throw new Error(`Dedicated network guard missing: ${required}`);
+    }
+  }
+  if (/"\$supabase_bin" start(?:\s|$)(?!\s*--network-id)/m.test(driver)) {
+    throw new Error("Supabase startup can omit the dedicated network");
+  }
+});
+
+Deno.test("approval marker is bound to the exact driver revision", () => {
+  const marker = driver.indexOf('[[ -f "$marker" ]]');
+  const hash = driver.indexOf('"$sha256sum_bin" -- "$0"');
+  const stale = driver.indexOf('fail "approval-marker-stale"');
+  const dispatch = driver.indexOf('case "$phase" in', marker);
+  if (marker < 0 || hash <= marker || stale <= hash || dispatch <= stale) {
+    throw new Error("Stale marker rejection does not precede phase dispatch");
+  }
+  if (!driver.includes('"driver-sha256:${driver_hash,,}"')) {
+    throw new Error("Approval is not bound to the exact driver SHA-256");
+  }
+});
+
 Deno.test("migration discovery is quarantined and restored with checksum verification", () => {
   const phase = driver.slice(driver.lastIndexOf("start-local-stack)"));
   const validation = phase.indexOf("validate_migrations");
