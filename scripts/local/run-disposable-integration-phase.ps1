@@ -30,6 +30,40 @@ function Resolve-ApprovedTool {
     throw "Approved executable is unavailable: $Name"
 }
 
+function Resolve-ApprovedDocker {
+    param([string]$ReviewedPath)
+
+    if (Test-Path -LiteralPath $ReviewedPath -PathType Leaf) {
+        $resolvedReviewedPath = (Resolve-Path -LiteralPath $ReviewedPath).Path
+        if (-not [System.IO.Path]::IsPathFullyQualified($resolvedReviewedPath)) {
+            throw 'Reviewed Docker executable path is not absolute'
+        }
+        return [string]$resolvedReviewedPath
+    }
+
+    $applications = @(
+        Get-Command 'docker.exe' -CommandType Application -All -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                if ($_.Source -is [string] -and (Test-Path -LiteralPath $_.Source -PathType Leaf)) {
+                    (Resolve-Path -LiteralPath $_.Source).Path
+                }
+            } |
+            Sort-Object -Unique
+    )
+    if ($applications.Count -eq 0) {
+        throw 'Approved Docker executable is unavailable'
+    }
+    if ($applications.Count -ne 1) {
+        throw 'Approved Docker executable fallback is ambiguous'
+    }
+    $resolvedFallback = [string]$applications[0]
+    if (-not [System.IO.Path]::IsPathFullyQualified($resolvedFallback) -or
+        -not (Test-Path -LiteralPath $resolvedFallback -PathType Leaf)) {
+        throw 'Approved Docker executable fallback is invalid'
+    }
+    return $resolvedFallback
+}
+
 $deno = Resolve-ApprovedTool 'deno' @(
     (Join-Path $repoRoot '.tools\deno-recovered\deno.exe')
 )
@@ -40,9 +74,8 @@ $psql = Resolve-ApprovedTool 'psql' @(
     'C:\Program Files\PostgreSQL\17.11\bin\psql.exe',
     'C:\Tools\PostgreSQL\17.11\bin\psql.exe'
 )
-$docker = Resolve-ApprovedTool 'docker' @(
-    'C:\Program Files\Docker\Docker\resources\bin\docker.exe'
-)
+$docker = Resolve-ApprovedDocker `
+    'C:\Users\Jagdamb\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe'
 $bash = Resolve-ApprovedTool 'bash' @('C:\Program Files\Git\bin\bash.exe')
 $gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
 $sha256sum = Resolve-ApprovedTool 'sha256sum' @(

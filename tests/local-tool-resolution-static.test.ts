@@ -11,7 +11,7 @@ Deno.test("Windows wrapper pins every approved tool without PATH mutation", () =
     const required of [
       ".tools\\deno-recovered\\deno.exe",
       "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\PostgreSQLClient\\17.11\\bin\\psql.exe",
-      "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe",
+      "C:\\Users\\Jagdamb\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe",
       "deno 2.8.1",
       "PostgreSQL\\) 17\\.11",
       "Docker Client version is not exactly 29.7.2",
@@ -44,6 +44,46 @@ Deno.test("Windows wrapper pins every approved tool without PATH mutation", () =
     if (wrapper.includes(forbidden)) {
       throw new Error(`Persistent or broad tool behavior: ${forbidden}`);
     }
+  }
+});
+
+Deno.test("Windows Docker resolution is singular, deterministic, and fail closed", () => {
+  const start = wrapper.indexOf("function Resolve-ApprovedDocker");
+  const end = wrapper.indexOf("$deno = Resolve-ApprovedTool", start);
+  const resolver = wrapper.slice(start, end);
+  const reviewed = resolver.indexOf(
+    "Test-Path -LiteralPath $ReviewedPath -PathType Leaf",
+  );
+  const fallback = resolver.indexOf(
+    "Get-Command 'docker.exe' -CommandType Application -All",
+  );
+  if (start < 0 || end <= start || reviewed < 0 || fallback <= reviewed) {
+    throw new Error("Exact reviewed docker.exe does not win before fallback");
+  }
+  for (
+    const required of [
+      "Sort-Object -Unique",
+      "$applications.Count -eq 0",
+      "$applications.Count -ne 1",
+      "fallback is ambiguous",
+      "$resolvedFallback = [string]$applications[0]",
+      "IsPathFullyQualified($resolvedFallback)",
+      "Test-Path -LiteralPath $resolvedFallback -PathType Leaf",
+    ]
+  ) {
+    if (!resolver.includes(required)) {
+      throw new Error(`Docker fallback guard missing: ${required}`);
+    }
+  }
+  if (
+    resolver.includes("Get-Command 'docker' ") ||
+    resolver.includes("CommandType Alias") ||
+    resolver.includes("CommandType Function") ||
+    resolver.includes("CommandType ExternalScript")
+  ) {
+    throw new Error(
+      "Docker fallback can accept extensionless or non-application commands",
+    );
   }
 });
 
