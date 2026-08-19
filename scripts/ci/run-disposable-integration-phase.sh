@@ -121,9 +121,13 @@ case "$phase" in
     mv -- supabase/migrations/*.sql "$state_dir/migrations/"
     [[ -z "$(find supabase/migrations -name '*.sql' -print -quit)" ]] || fail "automatic-migration-discovery-not-empty"
     [[ "$("$docker_bin" compose version --short)" =~ ^v?2\. ]] || fail "docker-compose-v2-required"
+    permission_runner_temp="${BCI_RUNNER_TEMP_NATIVE:-${RUNNER_TEMP}}"
+    permission_github_env="${BCI_GITHUB_ENV_NATIVE:-${GITHUB_ENV}}"
+    permission_runtime_dir="${permission_runner_temp}/bci-compose-${BCI_TEST_RUN_ID}"
     "$deno_bin" run \
       --allow-env=RUNNER_TEMP,GITHUB_ENV,BCI_TEST_RUN_ID,BCI_RUNNER_TEMP_NATIVE,BCI_GITHUB_ENV_NATIVE \
-      --allow-read=.,"${RUNNER_TEMP}" --allow-write="${RUNNER_TEMP}","${GITHUB_ENV}" \
+      --allow-read=.,"${permission_runner_temp}","${permission_github_env}" \
+      --allow-write="${permission_runtime_dir}","${permission_github_env}" \
       scripts/ci/prepare-compose-runtime.ts || fail "runtime-secret-preparation-failed"
     runtime_dir="$(sed -n 's/^BCI_RUNTIME_DIR=//p' "${GITHUB_ENV}" | tail -n 1)"
     [[ "$runtime_dir" == "${RUNNER_TEMP}/bci-compose-${BCI_TEST_RUN_ID}" ]] || fail "runtime-directory-rejected"

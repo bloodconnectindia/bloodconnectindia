@@ -156,6 +156,32 @@ Deno.test("runtime preparation and cleanup never expose secret material", () => 
   }
 });
 
+Deno.test("runtime preparation uses native and run-scoped Deno permissions", () => {
+  const start = driver.indexOf("start-local-stack)");
+  const end = driver.indexOf("runtime-environment)", start);
+  const phase = driver.slice(start, end);
+  for (
+    const required of [
+      'permission_runner_temp="${BCI_RUNNER_TEMP_NATIVE:-${RUNNER_TEMP}}"',
+      'permission_github_env="${BCI_GITHUB_ENV_NATIVE:-${GITHUB_ENV}}"',
+      'permission_runtime_dir="${permission_runner_temp}/bci-compose-${BCI_TEST_RUN_ID}"',
+      '--allow-read=.,"${permission_runner_temp}","${permission_github_env}"',
+      '--allow-write="${permission_runtime_dir}","${permission_github_env}"',
+      "--allow-env=RUNNER_TEMP,GITHUB_ENV,BCI_TEST_RUN_ID,BCI_RUNNER_TEMP_NATIVE,BCI_GITHUB_ENV_NATIVE",
+    ]
+  ) {
+    if (!phase.includes(required)) {
+      throw new Error(`Scoped Deno permission missing: ${required}`);
+    }
+  }
+  if (
+    /(?:^|\s)--allow-(?:read|write)(?:\s|\\|$)/m.test(phase) ||
+    phase.includes("--allow-all")
+  ) {
+    throw new Error("Unrestricted Deno filesystem permission is present");
+  }
+});
+
 Deno.test("server-only disposable variables do not enter browser sources", async () => {
   const browserFiles: URL[] = [];
   const collect = async (directory: URL) => {
