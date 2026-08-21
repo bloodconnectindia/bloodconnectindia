@@ -22,7 +22,8 @@ Deno.test('password reset response stays generic and eligibility is active Admin
   const source = await read('./admin-password-reset-request/index.ts')
   assertMatch(source, /lower\(u\.role\)='admin'/)
   assertMatch(source, /lower\(u\.status\)='active'/)
-  assertEquals(source.match(/accepted: true/g)?.length, 2)
+  assertMatch(source, /const generic = \{ accepted: true \}/)
+  assertEquals(source.match(/return productionCorsReply\(request, generic\);/g)?.length, 2)
   assertFalse(source.includes('SUPABASE_SERVICE_ROLE_KEY'))
 })
 

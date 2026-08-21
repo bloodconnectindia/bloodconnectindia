@@ -146,7 +146,7 @@ Deno.test("forgot password copy is exact and enumeration resistance remains serv
   if (!forgot.includes("Enter your registered email address.")) throw new Error("Forgot password wording differs");
   if (forgot.includes("The response remains the same whether or not an eligible account exists.")) throw new Error("Removed explanatory copy remains visible");
   if (!forgotClient.includes("If an eligible account exists, a reset link will be sent.")) throw new Error("Generic client response is missing");
-  for (const required of ["return reply({ accepted: true })", "catch { return reply({ accepted: true }) }"]) {
+  for (const required of ["const generic = { accepted: true }", "return productionCorsReply(request, generic);"]) {
     if (!resetRequestFunction.includes(required)) throw new Error(`Server enumeration protection is missing ${required}`);
   }
 });
