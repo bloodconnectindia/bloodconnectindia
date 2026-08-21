@@ -143,6 +143,29 @@ Deno.test("Pages workflow uses only public variables and a generated artifact", 
   if (generate < 0 || upload <= generate || deploy <= upload) throw new Error("Pages workflow generation/deployment order is invalid");
 });
 
+Deno.test("Pages deployment is manual-only with pinned actions", async () => {
+  const workflow = await read(".github/workflows/pages.yml");
+  const triggerStart = workflow.indexOf("on:\n");
+  const permissionsStart = workflow.indexOf("\npermissions:");
+  if (triggerStart < 0 || permissionsStart <= triggerStart) throw new Error("Pages workflow trigger block is malformed");
+  const trigger = workflow.slice(triggerStart, permissionsStart).trim();
+  if (trigger !== "on:\n  workflow_dispatch:") throw new Error("Pages deployment is not manual-only");
+  if (/^\s{2}(push|pull_request|schedule|workflow_run|repository_dispatch):/m.test(trigger)) {
+    throw new Error("Pages workflow contains an automatic deployment trigger");
+  }
+  if ([...workflow.matchAll(/actions\/deploy-pages@/g)].length !== 1) {
+    throw new Error("Pages workflow must contain exactly one manual deploy-pages step");
+  }
+  const variables = [...workflow.matchAll(/vars\.([A-Z0-9_]+)/g)].map((match) => match[1]).sort();
+  if (variables.join(",") !== "BCI_SUPABASE_PUBLISHABLE_KEY,BCI_SUPABASE_URL") {
+    throw new Error("Pages workflow public variable boundary changed");
+  }
+  const actions = [...workflow.matchAll(/uses:\s*([^\s]+)/g)].map((match) => match[1]);
+  if (!actions.length || actions.some((action) => !/@[0-9a-f]{40}$/.test(action))) {
+    throw new Error("Pages workflow contains an unpinned action");
+  }
+});
+
 Deno.test("authentication routing remains server verified and browser role neutral", async () => {
   const login = await read("pages/login.html");
   const auth = await read("js/auth.js");
