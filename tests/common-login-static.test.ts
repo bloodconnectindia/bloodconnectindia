@@ -68,6 +68,57 @@ Deno.test("auth code uses the explicitly initialized Supabase browser client", (
   }
 });
 
+Deno.test("missing Supabase runtime client fails closed with a controlled auth error", async () => {
+  const fakeWindow: Record<string, unknown> = {};
+  new Function("window", authClient)(fakeWindow);
+  const auth = fakeWindow.BloodConnectAuth as { signIn(email: string, password: string): Promise<unknown> };
+  try {
+    await auth.signIn("invalid@example.invalid", "not-a-real-password");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Authentication service is unavailable. Please try again later.") return;
+    throw error;
+  }
+  throw new Error("Missing Supabase client did not fail closed");
+});
+
+Deno.test("login runtime uses server-verified identity before establishing the session", async () => {
+  const session = { access_token: "test-access", refresh_token: "test-refresh" };
+  let response: Record<string, unknown> = { session, verified_identity: { role: "Admin", status: "Active" } };
+  let invokeError: Error | null = null;
+  let established = false;
+  const fakeWindow = {
+    supabaseClient: {
+      functions: { invoke: async () => ({ data: response, error: invokeError }) },
+      auth: { setSession: async () => { established = true; return { error: null }; } },
+    },
+  } as Record<string, unknown>;
+  new Function("window", authClient)(fakeWindow);
+  const auth = fakeWindow.BloodConnectAuth as { signIn(email: string, password: string): Promise<{ destination: string }> };
+  const result = await auth.signIn("admin@example.invalid", "not-a-real-password");
+  if (result.destination !== "admin-dashboard.html" || !established) throw new Error("Verified Admin login did not establish its routed session");
+
+  established = false;
+  invokeError = new Error("invalid credentials");
+  let invalidRejected = false;
+  try {
+    await auth.signIn("admin@example.invalid", "invalid-password");
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== "Unable to sign in. Please try again." || established) throw error;
+    invalidRejected = true;
+  }
+  if (!invalidRejected) throw new Error("Invalid credentials did not fail closed");
+
+  invokeError = null;
+  response = { session, verified_identity: { role: "Hospital", status: "Active" } };
+  try {
+    await auth.signIn("hospital@example.invalid", "not-a-real-password");
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("verified supported destination") && !established) return;
+    throw error;
+  }
+  throw new Error("Unsupported verified role did not fail closed before session establishment");
+});
+
 Deno.test("common auth pages use neutral branding before authentication", () => {
   for (const [name, html] of [["login", login], ["forgot", forgot], ["reset", reset]] as const) {
     for (const required of ["BloodConnectIndia", "Connecting Donors. Saving Lives."]) {

@@ -1,4 +1,12 @@
 window.BloodConnectAuth = {
+    getClient() {
+        const client = window.supabaseClient;
+        if (!client?.functions?.invoke || !client?.auth) {
+            throw new Error("Authentication service is unavailable. Please try again later.");
+        }
+        return client;
+    },
+
     resolveVerifiedDestination(data) {
         const identity = data?.verified_identity;
         if (identity?.role === "Admin" && identity?.status === "Active") {
@@ -8,7 +16,8 @@ window.BloodConnectAuth = {
     },
 
     async signIn(email, password) {
-        const { data, error } = await window.supabaseClient.functions.invoke("admin-login", {
+        const client = this.getClient();
+        const { data, error } = await client.functions.invoke("admin-login", {
             body: { email, password }
         });
 
@@ -22,7 +31,7 @@ window.BloodConnectAuth = {
 
         const destination = this.resolveVerifiedDestination(data);
 
-        const { error: sessionError } = await window.supabaseClient.auth.setSession(data.session);
+        const { error: sessionError } = await client.auth.setSession(data.session);
         if (sessionError) {
             throw new Error("Unable to establish a secure session.");
         }
@@ -31,7 +40,7 @@ window.BloodConnectAuth = {
     },
 
     async signOut() {
-        const { error } = await window.supabaseClient.auth.signOut();
+        const { error } = await this.getClient().auth.signOut();
 
         if (error) {
             throw error;
@@ -39,7 +48,7 @@ window.BloodConnectAuth = {
     },
 
     async getCurrentUser() {
-        const { data, error } = await window.supabaseClient.auth.getUser();
+        const { data, error } = await this.getClient().auth.getUser();
 
         if (error) {
             throw error;
@@ -60,7 +69,7 @@ window.BloodConnectAuth = {
 
     async requireVerifiedAdminSession() {
         const user = await this.requireAuthenticatedSession();
-        const { data, error } = await window.supabaseClient.functions.invoke("admin-session-authorization");
+        const { data, error } = await this.getClient().functions.invoke("admin-session-authorization");
         if (error || data?.verified_identity?.role !== "Admin" || data?.verified_identity?.status !== "Active") {
             throw new Error("This session is not authorized for the Admin workspace.");
         }
@@ -68,7 +77,7 @@ window.BloodConnectAuth = {
     },
 
     async requestPasswordReset(email) {
-        const { error } = await window.supabaseClient.functions.invoke("admin-password-reset-request", {
+        const { error } = await this.getClient().functions.invoke("admin-password-reset-request", {
             body: { email }
         });
 
