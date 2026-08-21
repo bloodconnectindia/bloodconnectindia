@@ -4,8 +4,15 @@ const home = await read("index.html");
 const login = await read("pages/login.html");
 const loginClient = await read("js/common-login.js");
 const authClient = await read("js/auth.js");
+const forgot = await read("pages/admin-forgot-password.html");
+const forgotClient = await read("js/admin-forgot-password.js");
+const reset = await read("pages/admin-reset-password.html");
+const resetClient = await read("js/admin-reset-password.js");
+const supabaseClient = await read("js/supabase.js");
+const authStyles = await read("css/auth.css");
 const adminShell = await read("js/admin-shell.js");
 const loginFunction = await read("supabase/functions/admin-login/index.ts");
+const resetRequestFunction = await read("supabase/functions/admin-password-reset-request/index.ts");
 const sessionFunction = await read("supabase/functions/admin-session-authorization/index.ts");
 const design = await read("docs/COMMON_LOGIN_AND_ROLE_ROUTING.md");
 
@@ -48,6 +55,62 @@ Deno.test("routing accepts only trusted active Admin verification and fails clos
   if (!adminShell.includes("requireVerifiedAdminSession")) throw new Error("Admin shell does not revalidate authorization");
   for (const required of ["auth.auth.getUser", "public.users", "lower(role)='admin'", "lower(status)='active'"]) {
     if (!sessionFunction.includes(required)) throw new Error(`Session authorization is missing ${required}`);
+  }
+});
+
+Deno.test("auth code uses the explicitly initialized Supabase browser client", () => {
+  if (!supabaseClient.includes("window.supabaseClient = window.supabase.createClient")) {
+    throw new Error("Supabase client is not initialized on the explicit browser boundary");
+  }
+  for (const [name, source] of [["auth", authClient], ["reset", resetClient]] as const) {
+    if (!source.includes("window.supabaseClient")) throw new Error(`${name} does not use the explicit client`);
+    if (/(^|[^.\w])supabaseClient\s*\./m.test(source)) throw new Error(`${name} contains a fragile bare supabaseClient reference`);
+  }
+});
+
+Deno.test("common auth pages use neutral branding before authentication", () => {
+  for (const [name, html] of [["login", login], ["forgot", forgot], ["reset", reset]] as const) {
+    for (const required of ["BloodConnectIndia", "Connecting Donors. Saving Lives."]) {
+      if (!html.includes(required)) throw new Error(`${name} is missing ${required}`);
+    }
+    if (/ADMIN WORKSPACE|HOSPITAL WORKSPACE|BLOOD BANK WORKSPACE/i.test(html)) {
+      throw new Error(`${name} exposes role-specific workspace branding`);
+    }
+  }
+});
+
+Deno.test("login password visibility control is accessible and does not handle password data", () => {
+  for (const required of ['type="password"', 'data-password-toggle="login-password"', 'aria-label="Show password"', 'aria-pressed="false"']) {
+    if (!login.includes(required)) throw new Error(`Login password toggle is missing ${required}`);
+  }
+  for (const required of ['password.type = show ? "text" : "password"', 'show ? "Hide password" : "Show password"']) {
+    if (!loginClient.includes(required)) throw new Error(`Password toggle behavior is missing ${required}`);
+  }
+  for (const forbidden of ["console.", "localStorage", "sessionStorage", "fetch("]) {
+    if (loginClient.includes(forbidden)) throw new Error(`Password UI contains forbidden handling: ${forbidden}`);
+  }
+});
+
+Deno.test("forgot password copy is exact and enumeration resistance remains server-backed", () => {
+  if (!forgot.includes("Enter your registered email address.")) throw new Error("Forgot password wording differs");
+  if (forgot.includes("The response remains the same whether or not an eligible account exists.")) throw new Error("Removed explanatory copy remains visible");
+  if (!forgotClient.includes("If an eligible account exists, a reset link will be sent.")) throw new Error("Generic client response is missing");
+  for (const required of ["return reply({ accepted: true })", "catch { return reply({ accepted: true }) }"]) {
+    if (!resetRequestFunction.includes(required)) throw new Error(`Server enumeration protection is missing ${required}`);
+  }
+});
+
+Deno.test("auth UI includes responsive, focus, loading, error, and disabled structures", () => {
+  for (const required of ["@media(max-width:480px)", ":focus-visible", ":disabled", ".auth-message[data-state=loading]", "width:min(100%,30rem)", "min-width:320px", "[hidden]{display:none!important}"]) {
+    if (!authStyles.includes(required)) throw new Error(`Auth structural state is missing ${required}`);
+  }
+  if (!loginClient.includes("submit.disabled = true") || !loginClient.includes('message.dataset.state = "error"')) throw new Error("Login runtime states are incomplete");
+});
+
+Deno.test("frontend auth changes contain no privileged Supabase secret material", () => {
+  const combined = [login, forgot, reset, loginClient, authClient, forgotClient, resetClient, authStyles].join("\n");
+  for (const forbidden of ["service_role", "SUPABASE_SERVICE_ROLE", "sb_secret_", "admin credentials"]) {
+    if (combined.toLowerCase().includes(forbidden.toLowerCase())) throw new Error(`Frontend contains privileged material marker: ${forbidden}`);
   }
 });
 

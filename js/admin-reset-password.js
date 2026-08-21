@@ -27,18 +27,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             const field = document.getElementById(button.dataset.passwordToggle);
             const show = field.type === "password";
             field.type = show ? "text" : "password";
-            button.textContent = show ? "Hide" : "Show";
-            button.setAttribute("aria-label", `${show ? "Hide" : "Show"} ${field === password ? "new" : "confirmed"} password`);
+            button.setAttribute("aria-label", show ? "Hide password" : "Show password");
+            button.setAttribute("aria-pressed", String(show));
         });
     });
 
-    const { data: listener } = supabaseClient.auth.onAuthStateChange((event) => {
+    const { data: listener } = window.supabaseClient.auth.onAuthStateChange((event) => {
         if (event === "PASSWORD_RECOVERY") recoveryEventReceived = true;
     });
 
     try {
         await new Promise(resolve => window.setTimeout(resolve, 150));
-        const { data, error } = await supabaseClient.auth.getSession();
+        const { data, error } = await window.supabaseClient.auth.getSession();
         const validSession = Boolean(data?.session?.user && data.session.access_token);
         if (error || !validSession || (!recoveryIndicated && !recoveryEventReceived)) {
             failRecovery();
@@ -79,12 +79,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmation.disabled = true;
         setMessage("Updating password…", "loading");
         try {
-            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+            const { error } = await window.supabaseClient.auth.updateUser({ password: newPassword });
             if (error) throw error;
             password.value = "";
             confirmation.value = "";
             form.hidden = true;
-            await supabaseClient.auth.signOut({ scope: "local" });
+            await window.supabaseClient.auth.signOut({ scope: "local" });
             intro.textContent = "Your password was updated successfully.";
             setMessage("Returning to Login. Sign in again to verify account eligibility.", "success");
             window.setTimeout(() => window.location.replace("login.html"), 1800);

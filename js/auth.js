@@ -8,7 +8,7 @@ window.BloodConnectAuth = {
     },
 
     async signIn(email, password) {
-        const { data, error } = await supabaseClient.functions.invoke("admin-login", {
+        const { data, error } = await window.supabaseClient.functions.invoke("admin-login", {
             body: { email, password }
         });
 
@@ -22,7 +22,7 @@ window.BloodConnectAuth = {
 
         const destination = this.resolveVerifiedDestination(data);
 
-        const { error: sessionError } = await supabaseClient.auth.setSession(data.session);
+        const { error: sessionError } = await window.supabaseClient.auth.setSession(data.session);
         if (sessionError) {
             throw new Error("Unable to establish a secure session.");
         }
@@ -31,7 +31,7 @@ window.BloodConnectAuth = {
     },
 
     async signOut() {
-        const { error } = await supabaseClient.auth.signOut();
+        const { error } = await window.supabaseClient.auth.signOut();
 
         if (error) {
             throw error;
@@ -39,7 +39,7 @@ window.BloodConnectAuth = {
     },
 
     async getCurrentUser() {
-        const { data, error } = await supabaseClient.auth.getUser();
+        const { data, error } = await window.supabaseClient.auth.getUser();
 
         if (error) {
             throw error;
@@ -60,7 +60,7 @@ window.BloodConnectAuth = {
 
     async requireVerifiedAdminSession() {
         const user = await this.requireAuthenticatedSession();
-        const { data, error } = await supabaseClient.functions.invoke("admin-session-authorization");
+        const { data, error } = await window.supabaseClient.functions.invoke("admin-session-authorization");
         if (error || data?.verified_identity?.role !== "Admin" || data?.verified_identity?.status !== "Active") {
             throw new Error("This session is not authorized for the Admin workspace.");
         }
@@ -68,7 +68,7 @@ window.BloodConnectAuth = {
     },
 
     async requestPasswordReset(email) {
-        const { error } = await supabaseClient.functions.invoke("admin-password-reset-request", {
+        const { error } = await window.supabaseClient.functions.invoke("admin-password-reset-request", {
             body: { email }
         });
 
