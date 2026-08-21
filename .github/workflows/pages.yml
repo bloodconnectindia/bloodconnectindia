@@ -1,0 +1,54 @@
+name: Build and deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: 2.8.1
+
+      - name: Test Pages runtime configuration boundary
+        run: deno test --allow-read=. tests/pages-runtime-config-static.test.ts tests/supabase-browser-config.test.ts tests/common-login-static.test.ts
+
+      - name: Generate fail-closed Pages artifact
+        env:
+          BCI_SUPABASE_URL: ${{ vars.BCI_SUPABASE_URL }}
+          BCI_SUPABASE_PUBLISHABLE_KEY: ${{ vars.BCI_SUPABASE_PUBLISHABLE_KEY }}
+        run: deno run --allow-env=BCI_SUPABASE_URL,BCI_SUPABASE_PUBLISHABLE_KEY --allow-read=. --allow-write=_site scripts/ci/build-pages-site.ts _site
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload generated Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - name: Deploy generated Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

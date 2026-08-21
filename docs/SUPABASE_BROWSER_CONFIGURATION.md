@@ -9,7 +9,7 @@ page that needs Supabase must receive an explicit runtime configuration before
 window.__BLOODCONNECT_SUPABASE_CONFIG__ = {
   environment: "local",
   url: "http://127.0.0.1:54321",
-  publishableKey: "sb_publishable_REPLACE_WITH_LOCAL_VALUE"
+  publishableKey: "<browser-safe-publishable-key>"
 };
 </script>
 ```
@@ -45,3 +45,21 @@ mandatory.
 Production values must be supplied by the production hosting configuration.
 Preview, development, and test deployments must use their own explicit projects
 or approved local targets. Never reuse production configuration for local work.
+
+## GitHub Pages artifact generation
+
+The Pages workflow reads only the public GitHub Actions variables
+`BCI_SUPABASE_URL` and `BCI_SUPABASE_PUBLISHABLE_KEY`. The deterministic builder
+validates both values and writes `js/supabase-runtime-config.js` only inside the
+generated `_site` deployment artifact. A production-value runtime file must not
+be committed to the repository.
+
+For every HTML page that initializes `js/supabase.js`, the artifact builder
+inserts the generated script after `js/supabase-config.js` and before
+`js/supabase.js`. Missing, malformed, loopback, non-HTTPS, credential-bearing,
+or secret-like configuration stops the build before artifact upload or deploy.
+
+Repository administrators must explicitly configure GitHub Pages to use GitHub
+Actions and define the two public variables before enabling the workflow. The
+workflow does not require or accept a service-role key, database credential,
+Supabase access token, JWT signing secret, or administrator credential.
